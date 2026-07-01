@@ -52,7 +52,7 @@ router.get('/my-businesses',authMiddleware, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
-
+//get a business by id
 router.get('/:id',async (req, res) => {
     try{
 
@@ -106,4 +106,33 @@ router.put('/:id',authMiddleware, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
-    
+    //delete a business
+router.delete('/:id',authMiddleware, async (req, res) => {
+    try{
+        const {id} = req.params;
+        const business = await Business.findById(id);
+        if(!business){
+            return res.status(404).json({
+                success: false,
+                message: 'Business not found'
+            });
+        }
+        if(business.owner.toString() !== req.user._id.toString()){
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized'
+            });
+        }
+        await Business.findByIdAndDelete(id);
+        return res.status(200).json({
+            success: true,
+            message: 'Business deleted successfully'
+        });
+
+    }catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+module.exports = router;
