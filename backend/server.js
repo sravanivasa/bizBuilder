@@ -10,7 +10,8 @@ const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const productRoutes = require("./routes/productRoutes");
-
+const orderRoutes = require("./routes/orderRoutes");
+const { errorHandler } = require("./middleware/errorMiddleware");
 const app = express();
 
 // Middleware
@@ -31,7 +32,8 @@ app.use("/api/users", (req, res, next) => {
 app.use("/api/users", userRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/products", productRoutes);
-
+app.use("/api/orders", orderRoutes);
+app.use(errorHandler);
 app.use((error, req, res, next) => {
     if (error.name === "MulterError") {
         const message = error.code === "LIMIT_FILE_SIZE"
@@ -60,5 +62,6 @@ const startServer = async () => {
         process.exit(1);
     }
 };
+
 
 startServer();
