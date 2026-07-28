@@ -1,11 +1,11 @@
 const Product = require("../models/Product");
 const Business = require("../models/Business");
 const { validationResult } = require("express-validator");
+const asyncHandler = require("../middleware/asyncHandler");
 
-const createProduct = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
+const createProduct = asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
@@ -35,40 +35,28 @@ const createProduct = async (req, res) => {
         });
 
         res.status(201).json({ success: true, message: "Product created successfully", product });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: "Server Error" });
-    }
-};
+   
+});
 
-const getProductsByBusiness = async (req, res) => {
-    try {
-        const { businessId } = req.params;
-        const products = await Product.find({ business: businessId });
+const getProductsByBusiness = asyncHandler(async (req, res) => {
+    const { businessId } = req.params;
+    const products = await Product.find({ business: businessId });
         res.status(200).json({ success: true, products });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: "Server Error" });
-    }
-};
+   
+});
 
-const getProductById = async (req, res) => {
-    try {
-        const product = await Product.findById(req.params.productId);
-        if (!product) {
+const getProductById = asyncHandler(async (req, res) => {
+    const product = await Product.findById(req.params.productId);
+    if (!product) {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
         res.status(200).json({ success: true, product });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: "Server Error" });
-    }
-};
+    
+});
 
-const updateProduct = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
+const updateProduct = asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
@@ -93,16 +81,12 @@ const updateProduct = async (req, res) => {
         });
 
         res.status(200).json({ success: true, message: "Product updated successfully", product: updatedProduct });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: "Server Error" });
-    }
-};
+    
+});
 
-const deleteProduct = async (req, res) => {
-    try {
-        const product = await Product.findById(req.params.productId);
-        if (!product) {
+const deleteProduct = asyncHandler(async (req, res) => {
+    const product = await Product.findById(req.params.productId);
+    if (!product) {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
 
@@ -113,11 +97,8 @@ const deleteProduct = async (req, res) => {
 
         await Product.findByIdAndDelete(req.params.productId);
         res.status(200).json({ success: true, message: "Product deleted successfully" });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: "Server Error" });
-    }
-};
+    
+});
 
 module.exports = {
     createProduct,

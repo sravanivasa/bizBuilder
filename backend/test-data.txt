@@ -3,3 +3,33 @@
 "email": "test@gmail.com",
 "password": "1234"
 }
+
+token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhM2ViN2E4ZWY2NjBjMmQ3NjVmNzBlNSIsImlhdCI6MTc4NDY5NTA3MSwiZXhwIjoxNzg1Mjk5ODcxfQ.wXHGI06T1O6fOVBsRo4htl4qnLo6AG1OKlbr6KeO7MU
+
+business
+"_id": "6a604b83a4db681e3f8e5a8e",
+
+
+To create a order
+
+   
+  "businessId": "6a604b83a4db681e3f8e5a8e",
+  "customerName": "Rana",
+  "customerPhone": "9876543220",
+  "customerAddress": "Hyderabad, Telangana",
+  "products": [
+    {
+      "product": "6a68255a740364c00ce3359f",
+      "quantity": 4
+    },
+    {
+      "product": "6a682515740364c00ce3359d",
+      "quantity": 5
+    }
+  ],
+  "paymentMethod": "UPI"
+}
+
+
+for fetching the order//to get order details
+GET http://localhost:5000/api/orders

@@ -1,8 +1,8 @@
-
 const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const {createOrderValidation, updateOrderStatusValidation} = require("../validators/orderValidator");
 
 const {
     createOrder,
@@ -16,6 +16,7 @@ const {
 router.post(
     "/",
     authMiddleware,
+    createOrderValidation,
     createOrder
 );
 
@@ -37,6 +38,7 @@ router.get(
 router.put(
     "/:id",
     authMiddleware,
+    updateOrderStatusValidation,
     updateOrderStatus
 );
 

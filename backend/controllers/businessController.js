@@ -1,11 +1,11 @@
 const Business = require("../models/Business");
 const { validationResult } = require("express-validator");
+const asyncHandler = require("../middleware/asyncHandler");
 
 // Create Business
-const createBusiness = async (req, res) => {
-    try {
-
-        const errors = validationResult(req);
+const createBusiness = asyncHandler(async (req, res) => {
+   
+    const errors = validationResult(req);
 
         if (!errors.isEmpty()) {
             return res.status(400).json({
@@ -42,23 +42,10 @@ const createBusiness = async (req, res) => {
             message: "Business created successfully",
             business
         });
-
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
-
-    }
-};
+});
 
 // Get Logged-in User Businesses
-const getMyBusinesses = async (req, res) => {
-
-    try {
+const getMyBusinesses = asyncHandler(async (req, res) => {
 
         const businesses = await Business.find({
             owner: req.user._id
@@ -69,26 +56,12 @@ const getMyBusinesses = async (req, res) => {
             message: "Businesses fetched successfully",
             businesses
         });
-
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
-
-    }
-
-};
+});
 
 // Get Business By ID
-const getBusinessById = async (req, res) => {
-
-    try {
-
-        const business = await Business.findById(req.params.id);
+const getBusinessById = asyncHandler(async (req, res) => {
+    
+    const business = await Business.findById(req.params.id);
 
         if (!business) {
             return res.status(404).json({
@@ -102,24 +75,10 @@ const getBusinessById = async (req, res) => {
             message: "Business fetched successfully",
             business
         });
-
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
-
-    }
-
-};
+});
 
 // Update Business
-const updateBusiness = async (req, res) => {
-
-    try {
+const updateBusiness = asyncHandler(async (req, res) => {
 
         const errors = validationResult(req);
 
@@ -160,24 +119,10 @@ const updateBusiness = async (req, res) => {
             message: "Business updated successfully",
             business: updatedBusiness
         });
-
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
-
-    }
-
-};
+});
 
 // Delete Business
-const deleteBusiness = async (req, res) => {
-
-    try {
+const deleteBusiness = asyncHandler(async (req, res) => {
 
         const business = await Business.findById(req.params.id);
 
@@ -202,18 +147,7 @@ const deleteBusiness = async (req, res) => {
             message: "Business deleted successfully"
         });
 
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
-
-    }
-
-};
+    });
 
 module.exports = {
     createBusiness,

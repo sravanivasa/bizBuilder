@@ -4,7 +4,10 @@ const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 
-const productValidators = require("../validators/productValidator");
+const {
+    createProductValidation,
+    updateProductValidation
+} = require("../validators/productValidator");
 
 const {
     createProduct,
@@ -19,7 +22,7 @@ router.post(
     "/:businessId",
     authMiddleware,
     upload.single("image"),
-    ...productValidators.createProductValidation,
+    ...createProductValidation,
     createProduct
 );
 
@@ -40,7 +43,7 @@ router.put(
     "/:productId",
     authMiddleware,
     upload.single("image"),
-    ...productValidators.updateProductValidation,
+    ...updateProductValidation,
     updateProduct
 );
 
