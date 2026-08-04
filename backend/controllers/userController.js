@@ -23,10 +23,25 @@ const registerUser = asyncHandler(async (req, res) => {
             password: hashedPassword
         });
 
+        const token = jwt.sign(
+            {
+                id: user._id
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "7d"
+            }
+        );
+
         res.status(201).json({
             success: true,
-            message: "User registered successfully",
-            data: user
+         message: "User registered successfully",
+         token,
+         user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+        }
         });   
 });
 

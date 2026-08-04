@@ -10,7 +10,11 @@ const morgan = require("morgan");
 const mongoSanitize = require("express-mongo-sanitize");
 const hpp = require("hpp");
 
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./config/swagger");
+
 const connectDB = require("./config/db");
+
 
 const userRoutes = require("./routes/userRoutes");
 const businessRoutes = require("./routes/businessRoutes");
@@ -42,8 +46,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-app.use(mongoSanitize());
+// TODO: Re-enable mongoSanitize after using an Express 5 compatible solution.
+//app.use(mongoSanitize());
 app.use(hpp());
 
 
@@ -58,6 +62,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
+
+// Swagger
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 //multer error handling
 app.use((error, req, res, next) => {
