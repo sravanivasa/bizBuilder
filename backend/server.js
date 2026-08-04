@@ -4,6 +4,11 @@ dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const morgan = require("morgan");
+const mongoSanitize = require("express-mongo-sanitize");
+const hpp = require("hpp");
 
 const connectDB = require("./config/db");
 
@@ -11,13 +16,36 @@ const userRoutes = require("./routes/userRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
-const { errorHandler } = require("./middleware/errorMiddleware");
+const errorHandler  = require("./middleware/errorMiddleware");
+
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100,
+    message: {
+        success: false,
+        message: "Too many requests. Please try again after 15 minutes."
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 const app = express();
 
-// Middleware
+
+app.use(helmet());
+app.use(limiter);
+app.use(morgan("dev"));
+
 app.use(cors());
+
+//middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
+app.use(mongoSanitize());
+app.use(hpp());
+
 
 // Test Route
 app.get("/", (req, res) => {
@@ -25,15 +53,13 @@ app.get("/", (req, res) => {
 });
 
 // Routes
-app.use("/api/users", (req, res, next) => {
-    console.log("User route hit:", req.method, req.url);
-    next();
-});
+
 app.use("/api/users", userRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
-app.use(errorHandler);
+
+//multer error handling
 app.use((error, req, res, next) => {
     if (error.name === "MulterError") {
         const message = error.code === "LIMIT_FILE_SIZE"
@@ -48,6 +74,10 @@ app.use((error, req, res, next) => {
 
     next(error);
 });
+
+//global error handler
+app.use(errorHandler);
+
 
 const PORT = process.env.PORT || 5000;
 
