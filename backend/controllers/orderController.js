@@ -3,119 +3,135 @@ const Business = require("../models/Business");
 const Product = require("../models/Product");
 const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
+const aggregateOrderProducts = require("../utils/aggregateOrderProducts");
+const { decrementStock, restoreStock } = require("../utils/orderInventory");
+
+const TERMINAL_ORDER_STATUSES = ["Delivered", "Cancelled", "Completed"];
+const DELETABLE_ORDER_STATUSES = ["Pending", "Cancelled"];
 
 const createOrder = asyncHandler(async (req, res) => {
-
     const errors = validationResult(req);
-    if(!errors.isEmpty()) {
+    if (!errors.isEmpty()) {
         return res.status(400).json({
             success: false,
             message: "Validation failed",
             errors: errors.array()
         });
-    }   
-     const {
+    }
+
+    const {
         businessId,
         customerName,
         customerPhone,
         customerAddress,
         products,
-        paymentMethod
+        paymentMethod = "Cash"
     } = req.body;
-    //check business
+
     const business = await Business.findById(businessId);
 
-           if (!business) {
-                return res.status(404).json({
-                 success: false,
-                 message: "Business not found"
-            });
-            }
-     //check owner       
-    if (business.owner.toString() !== req.user._id.toString()) {
-            return res.status(403).json({
+    if (!business) {
+        return res.status(404).json({
             success: false,
-             message: "Unauthorized"
-            });
+            message: "Business not found"
+        });
     }
 
-    let totalAmount = 0;
+    if (business.owner.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+            success: false,
+            message: "Forbidden"
+        });
+    }
+
+    const aggregatedProducts = aggregateOrderProducts(products);
     const orderProducts = [];
-    
-    //check every product and calculate total amount
-    for (const item of products) {
-        const product = await Product.findById(item.product);     
+    let totalAmount = 0;
+
+    for (const item of aggregatedProducts) {
+        const product = await Product.findById(item.product);
+
         if (!product) {
             return res.status(404).json({
                 success: false,
                 message: "Product not found"
             });
         }
+
+        if (product.business.toString() !== businessId) {
+            return res.status(400).json({
+                success: false,
+                message: `${product.productName} does not belong to this business`
+            });
+        }
+
         if (item.quantity > product.stock) {
             return res.status(400).json({
                 success: false,
                 message: `${product.productName} is out of stock`
             });
         }
+
         totalAmount += product.price * item.quantity;
-        orderProducts.push({ 
-             product: product._id,
+        orderProducts.push({
+            product: product._id,
             quantity: item.quantity,
             price: product.price
-         });
-    }
-    //create order
-    const order = await Order.create({
-        business: businessId,
-        customerName,
-        customerPhone,
-        customerAddress,
-        products: orderProducts,
-        totalAmount,
-        paymentMethod
-    });
-      // Reduce Stock
-    for (const item of products) {
-
-        const product = await Product.findById(item.product);
-
-        product.stock -= item.quantity;
-
-        await product.save();
-
+        });
     }
 
-    res.status(201).json({
-        success: true,
-          message: "Order placed successfully",order
-    }); 
+    let decrementedItems = [];
+
+    try {
+        decrementedItems = await decrementStock(aggregatedProducts);
+
+        const order = await Order.create({
+            business: businessId,
+            customerName,
+            customerPhone,
+            customerAddress,
+            products: orderProducts,
+            totalAmount,
+            paymentMethod
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "Order placed successfully",
+            order
+        });
+    } catch (error) {
+        if (decrementedItems.length) {
+            await restoreStock(decrementedItems);
+        }
+
+        throw error;
+    }
 });
-// to get all orders
+
 const getMyOrders = asyncHandler(async (req, res) => {
-    const business = await Business.findOne({
-    owner: req.user._id
-});
+    const businesses = await Business.find({ owner: req.user._id }).select("_id");
 
-if (!business) {
-    return res.status(404).json({
-        success: false,
-        message: "Business not found"
-    });
-}
- const orders = await Order.find({
-        business: business._id
-    });
+    if (!businesses.length) {
+        return res.status(200).json({
+            success: true,
+            message: "Orders fetched successfully",
+            orders: []
+        });
+    }
+
+    const businessIds = businesses.map((business) => business._id);
+    const orders = await Order.find({ business: { $in: businessIds } }).sort({ createdAt: -1 });
 
     res.status(200).json({
         success: true,
         message: "Orders fetched successfully",
         orders
     });
-
 });
-// to get order by id
+
 const getOrderById = asyncHandler(async (req, res) => {
-const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id);
 
     if (!order) {
         return res.status(404).json({
@@ -130,11 +146,12 @@ const order = await Order.findById(req.params.id);
             success: false,
             message: "Business not found"
         });
-    }   
+    }
+
     if (business.owner.toString() !== req.user._id.toString()) {
         return res.status(403).json({
             success: false,
-            message: "Unauthorized"
+            message: "Forbidden"
         });
     }
 
@@ -143,10 +160,8 @@ const order = await Order.findById(req.params.id);
         message: "Order fetched successfully",
         order
     });
-
 });
 
-// to update order status
 const updateOrderStatus = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -156,7 +171,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             errors: errors.array()
         });
     }
-
 
     const order = await Order.findById(req.params.id);
 
@@ -168,27 +182,35 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     }
 
     const business = await Business.findById(order.business);
-    if (!business) {        
-    return res.status(404).json({
-        success: false,
-        message: "Business not found"
-    });
+    if (!business) {
+        return res.status(404).json({
+            success: false,
+            message: "Business not found"
+        });
     }
 
     if (business.owner.toString() !== req.user._id.toString()) {
         return res.status(403).json({
             success: false,
-            message: "Unauthorized"
+            message: "Forbidden"
         });
     }
-    if(order.status === "Delivered" || order.status === "Cancelled") {
+
+    if (TERMINAL_ORDER_STATUSES.includes(order.orderStatus)) {
         return res.status(400).json({
             success: false,
-            message: "Cannot update status of Completed or Cancelled orders"
+            message: "Cannot update status of completed, delivered, or cancelled orders"
         });
     }
-    order.status = req.body.status;
 
+    const nextStatus = req.body.orderStatus;
+    const previousStatus = order.orderStatus;
+
+    if (nextStatus === "Cancelled" && previousStatus !== "Cancelled") {
+        await restoreStock(order.products);
+    }
+
+    order.orderStatus = nextStatus;
     await order.save();
 
     res.status(200).json({
@@ -196,9 +218,8 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
         message: "Order status updated successfully",
         order
     });
-
 });
-// to delete order
+
 const deleteOrder = asyncHandler(async (req, res) => {
     const order = await Order.findById(req.params.id);
 
@@ -211,40 +232,36 @@ const deleteOrder = asyncHandler(async (req, res) => {
 
     const business = await Business.findById(order.business);
     if (!business) {
-    return res.status(404).json({
-        success: false,
-        message: "Business not found"
+        return res.status(404).json({
+            success: false,
+            message: "Business not found"
         });
     }
 
     if (business.owner.toString() !== req.user._id.toString()) {
         return res.status(403).json({
             success: false,
-            message: "Unauthorized"
+            message: "Forbidden"
         });
     }
-    if (order.status !== "Pending" && order.status !== "Cancelled") {
-    return res.status(400).json({
-        success: false,
-        message: "Only Pending or Cancelled orders can be deleted"
-    });
-}
-    //Restore Stock
-    for (const item of order.products) {
-        const product = await Product.findById(item.product);
-        if (product) {
-            product.stock += item.quantity;
-            await product.save();
-        }
+
+    if (!DELETABLE_ORDER_STATUSES.includes(order.orderStatus)) {
+        return res.status(400).json({
+            success: false,
+            message: "Only pending or cancelled orders can be deleted"
+        });
     }
-    
-    await order.deleteOne();       
+
+    if (order.orderStatus === "Pending") {
+        await restoreStock(order.products);
+    }
+
+    await order.deleteOne();
+
     res.status(200).json({
         success: true,
         message: "Order deleted successfully"
-    }); 
-
-
+    });
 });
 
 module.exports = {

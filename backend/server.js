@@ -7,24 +7,25 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
-const mongoSanitize = require("express-mongo-sanitize");
 const hpp = require("hpp");
 
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
+const { validateEnv } = require("./config/env");
 
 const connectDB = require("./config/db");
-
+const sanitizeInput = require("./middleware/sanitizeInput");
 
 const userRoutes = require("./routes/userRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
-const errorHandler  = require("./middleware/errorMiddleware");
+const errorHandler = require("./middleware/errorMiddleware");
 
+validateEnv();
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,
     max: 100,
     message: {
         success: false,
@@ -33,45 +34,41 @@ const limiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false
 });
-const app = express();
 
+const app = express();
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 app.use(helmet());
 app.use(limiter);
-app.use(morgan("dev"));
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(
+    cors({
+        origin: corsOrigin.split(",").map((origin) => origin.trim()),
+        credentials: true
+    })
+);
 
-app.use(cors());
-
-//middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// TODO: Re-enable mongoSanitize after using an Express 5 compatible solution.
-//app.use(mongoSanitize());
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+app.use(sanitizeInput);
 app.use(hpp());
 
-
-// Test Route
 app.get("/", (req, res) => {
-    res.send("Backend + MongoDB Ready 🚀");
+    res.send("Backend + MongoDB Ready");
 });
-
-// Routes
 
 app.use("/api/users", userRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
-
-// Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-//multer error handling
 app.use((error, req, res, next) => {
     if (error.name === "MulterError") {
-        const message = error.code === "LIMIT_FILE_SIZE"
-            ? "Image must be 5 MB or smaller"
-            : error.message;
+        const message =
+            error.code === "LIMIT_FILE_SIZE"
+                ? "Image must be 5 MB or smaller"
+                : error.message;
         return res.status(400).json({ success: false, message });
     }
 
@@ -82,16 +79,15 @@ app.use((error, req, res, next) => {
     next(error);
 });
 
-//global error handler
 app.use(errorHandler);
 
-
 const PORT = process.env.PORT || 5000;
+let server;
 
 const startServer = async () => {
     try {
         await connectDB();
-        app.listen(PORT, () => {
+        server = app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
         });
     } catch (error) {
@@ -100,5 +96,16 @@ const startServer = async () => {
     }
 };
 
+const shutdown = async (signal) => {
+    console.log(`${signal} received. Shutting down gracefully...`);
+    if (server) {
+        server.close(() => process.exit(0));
+    } else {
+        process.exit(0);
+    }
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 startServer();

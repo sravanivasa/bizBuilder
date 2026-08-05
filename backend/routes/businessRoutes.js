@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const validateObjectId = require("../middleware/validateObjectId");
 
 const {
     createBusinessValidation,
@@ -16,40 +17,16 @@ const {
     deleteBusiness
 } = require("../controllers/businessController");
 
-// Create Business
-router.post(
-    "/",
-    authMiddleware,
-    ...createBusinessValidation,
-    createBusiness
-);
-
-// Get Logged-in User Businesses
-router.get(
-    "/my-businesses",
-    authMiddleware,
-    getMyBusinesses
-);
-
-// Get Business By ID
-router.get(
-    "/:id",
-    getBusinessById
-);
-
-// Update Business
+router.post("/", authMiddleware, ...createBusinessValidation, createBusiness);
+router.get("/my-businesses", authMiddleware, getMyBusinesses);
+router.get("/:id", validateObjectId("id"), getBusinessById);
 router.put(
     "/:id",
     authMiddleware,
+    validateObjectId("id"),
     ...updateBusinessValidation,
     updateBusiness
 );
-
-// Delete Business
-router.delete(
-    "/:id",
-    authMiddleware,
-    deleteBusiness
-);
+router.delete("/:id", authMiddleware, validateObjectId("id"), deleteBusiness);
 
 module.exports = router;

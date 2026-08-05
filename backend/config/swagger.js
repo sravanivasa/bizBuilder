@@ -1,3 +1,4 @@
+const path = require("path");
 const swaggerJsdoc = require("swagger-jsdoc");
 
 const options = {
@@ -10,10 +11,9 @@ const options = {
         },
         servers: [
             {
-                url: "http://localhost:5000"
+                url: process.env.API_URL || "http://localhost:5000"
             }
         ],
-
         components: {
             securitySchemes: {
                 bearerAuth: {
@@ -24,7 +24,7 @@ const options = {
             }
         }
     },
-    apis: ["./docs/**/*.js"]
+    apis: [path.join(__dirname, "../docs/**/*.js")]
 };
 
 const swaggerSpec = swaggerJsdoc(options);

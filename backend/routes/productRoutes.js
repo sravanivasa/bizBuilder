@@ -3,6 +3,7 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
+const validateObjectId = require("../middleware/validateObjectId");
 
 const {
     createProductValidation,
@@ -17,40 +18,36 @@ const {
     deleteProduct
 } = require("../controllers/productController");
 
-// Create Product
 router.post(
     "/:businessId",
     authMiddleware,
+    validateObjectId("businessId"),
     upload.single("image"),
     ...createProductValidation,
     createProduct
 );
 
-// Get Products of Business
 router.get(
     "/business/:businessId",
+    validateObjectId("businessId"),
     getProductsByBusiness
 );
 
-// Get Product By ID
-router.get(
-    "/:productId",
-    getProductById
-);
+router.get("/:productId", validateObjectId("productId"), getProductById);
 
-// Update Product
 router.put(
     "/:productId",
     authMiddleware,
+    validateObjectId("productId"),
     upload.single("image"),
     ...updateProductValidation,
     updateProduct
 );
 
-// Delete Product
 router.delete(
     "/:productId",
     authMiddleware,
+    validateObjectId("productId"),
     deleteProduct
 );
 

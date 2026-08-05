@@ -3,15 +3,33 @@ const { body } = require("express-validator");
 const createProductValidation = [
     body("productName").trim().notEmpty().withMessage("Product name is required"),
     body("description").optional().isString(),
-    body("price").trim().notEmpty().isFloat({ gt: 0 }).withMessage("Price must be a positive number")   ,
-    body("stock").optional().isInt({ min: 0 })
+    body("price")
+        .notEmpty()
+        .withMessage("Price is required")
+        .isFloat({ gt: 0 })
+        .withMessage("Price must be a positive number"),
+    body("stock")
+        .notEmpty()
+        .withMessage("Stock is required")
+        .isInt({ min: 0 })
+        .withMessage("Stock must be zero or greater")
 ];
 
 const updateProductValidation = [
-    body("productName").trim().optional().notEmpty().withMessage("Product name is required"),
+    body("productName")
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage("Product name cannot be empty"),
     body("description").optional().isString(),
-    body("price").trim().optional().isFloat({ gt: 0 }).withMessage("Price must be a positive number"),
-    body("stock").optional().isInt({ min: 0 })
+    body("price")
+        .optional()
+        .isFloat({ gt: 0 })
+        .withMessage("Price must be a positive number"),
+    body("stock")
+        .optional()
+        .isInt({ min: 0 })
+        .withMessage("Stock must be zero or greater")
 ];
 
 module.exports = {

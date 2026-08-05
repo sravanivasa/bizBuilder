@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
-const {createOrderValidation, updateOrderStatusValidation} = require("../validators/orderValidator");
+const validateObjectId = require("../middleware/validateObjectId");
+const { createOrderValidation, updateOrderStatusValidation } = require("../validators/orderValidator");
 
 const {
     createOrder,
@@ -12,41 +13,16 @@ const {
     deleteOrder
 } = require("../controllers/orderController");
 
-// Create Order
-router.post(
-    "/",
-    authMiddleware,
-    createOrderValidation,
-    createOrder
-);
-
-// Get All Orders of Logged-in Business Owner
-router.get(
-    "/",
-    authMiddleware,
-    getMyOrders
-);
-
-// Get Order By ID
-router.get(
-    "/:id",
-    authMiddleware,
-    getOrderById
-);
-
-// Update Order Status
+router.post("/", authMiddleware, ...createOrderValidation, createOrder);
+router.get("/", authMiddleware, getMyOrders);
+router.get("/:id", authMiddleware, validateObjectId("id"), getOrderById);
 router.put(
     "/:id",
     authMiddleware,
-    updateOrderStatusValidation,
+    validateObjectId("id"),
+    ...updateOrderStatusValidation,
     updateOrderStatus
 );
-
-// Delete Order
-router.delete(
-    "/:id",
-    authMiddleware,
-    deleteOrder
-);
+router.delete("/:id", authMiddleware, validateObjectId("id"), deleteOrder);
 
 module.exports = router;

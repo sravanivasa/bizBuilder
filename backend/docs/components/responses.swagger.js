@@ -49,7 +49,7 @@
  *                 type: string
  *                 example: Resource not found
  *
- *     ServerError:
+ *     InternalServerError:
  *       description: Internal server error
  *       content:
  *         application/json:
@@ -62,4 +62,20 @@
  *               message:
  *                 type: string
  *                 example: Internal Server Error
+ *      
+ *     Forbidden:
+ *       description: Forbidden. You do not have permission to access this resource.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               success:
+ *                 type: boolean
+ *                 example: false
+ *               message:
+ *                 type: string
+ *                 example: Forbidden
+ *        
+ * 
  */

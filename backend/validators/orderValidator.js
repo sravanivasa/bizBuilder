@@ -1,9 +1,18 @@
 const { body } = require("express-validator");
 
+const ORDER_STATUSES = [
+    "Pending",
+    "Confirmed",
+    "Preparing",
+    "Completed",
+    "Cancelled",
+    "Delivered"
+];
+
 const createOrderValidation = [
     body("businessId")
-        .notEmpty()
-        .withMessage("Business ID is required"),
+        .isMongoId()
+        .withMessage("Invalid business ID"),
 
     body("customerName")
         .trim()
@@ -24,23 +33,26 @@ const createOrderValidation = [
         .isArray({ min: 1 })
         .withMessage("At least one product is required"),
 
+    body("products.*.product")
+        .isMongoId()
+        .withMessage("Each product ID must be valid"),
+
+    body("products.*.quantity")
+        .isInt({ min: 1 })
+        .withMessage("Each product quantity must be at least 1"),
+
     body("paymentMethod")
-        .isIn(["Cash", "Card", "UPI", "Net Banking"])
+        .optional()
+        .isIn(["Cash", "Card", "UPI"])
         .withMessage("Invalid payment method")
 ];
 
 const updateOrderStatusValidation = [
-    body("status")
-        .isIn([
-            "Pending",
-            "Confirmed",
-            "Preparing",
-            "Out for Delivery",
-            "Delivered",
-            "Cancelled"
-        ])
+    body("orderStatus")
+        .isIn(ORDER_STATUSES)
         .withMessage("Invalid order status")
 ];
+
 module.exports = {
     createOrderValidation,
     updateOrderStatusValidation
