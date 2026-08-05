@@ -1,0 +1,13 @@
+{
+  "appName": "BizBuilder",
+  "login": "లాగిన్",
+  "register": "నమోదు",
+  "logout": "లాగ్ అవుట్",
+  "dashboard": "డాష్‌బోర్డ్",
+  "business": "వ్యాపారం",
+  "products": "ఉత్పత్తులు",
+  "orders": "ఆర్డర్లు",
+  "welcome": "BizBuilder కు స్వాగతం",
+  "welcomeSubtitle": "మీ ఇంటి వ్యాపారాన్ని ఒకే చోట నిర్వహించండి.",
+  "language": "భాష"
+}

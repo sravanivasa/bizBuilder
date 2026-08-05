@@ -1,0 +1,13 @@
+{
+  "appName": "BizBuilder",
+  "login": "Login",
+  "register": "Register",
+  "logout": "Logout",
+  "dashboard": "Dashboard",
+  "business": "Business",
+  "products": "Products",
+  "orders": "Orders",
+  "welcome": "Welcome to BizBuilder",
+  "welcomeSubtitle": "Manage your home business in one place.",
+  "language": "Language"
+}

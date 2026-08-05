@@ -1,0 +1,13 @@
+{
+  "appName": "BizBuilder",
+  "login": "लॉगिन",
+  "register": "रजिस्टर",
+  "logout": "लॉग आउट",
+  "dashboard": "डैशबोर्ड",
+  "business": "व्यवसाय",
+  "products": "उत्पाद",
+  "orders": "ऑर्डर",
+  "welcome": "BizBuilder में आपका स्वागत है",
+  "welcomeSubtitle": "अपने होम बिज़नेस को एक जगह से मैनेज करें।",
+  "language": "भाषा"
+}
