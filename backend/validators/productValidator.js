@@ -32,7 +32,14 @@ const updateProductValidation = [
         .withMessage("Stock must be zero or greater")
 ];
 
+const bulkCreateProductsValidation = [
+    body("products")
+        .isArray({ min: 1 })
+        .withMessage("Products array is required and must not be empty")
+];
+
 module.exports = {
     createProductValidation,
-    updateProductValidation
+    updateProductValidation,
+    bulkCreateProductsValidation
 };

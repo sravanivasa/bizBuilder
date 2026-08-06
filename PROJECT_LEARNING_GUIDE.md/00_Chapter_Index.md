@@ -2,6 +2,8 @@
 
 Use this file to see which chapters are done, outdated, or planned.
 
+**Last updated:** Sprint 1 complete (owner dashboard)
+
 ---
 
 ## Chapters
@@ -15,14 +17,27 @@ Use this file to see which chapters are done, outdated, or planned.
 | 5 | `05_Validation.md` | express-validator | ⚠️ Partial | Business/order validators updated since writing |
 | 6 | `06_Middleware.md` | Middleware | ⚠️ Outdated | Says `mongo-sanitize` commented; we use `sanitizeInput.js` now |
 | 7 | `07_Swagger.md` | API docs | ⚠️ Partial | Docs consolidated to `user.swagger.js`, `business.swagger.js` |
-| 8 | `08_Backend_Production_Ready.md` | Security & hardening | ✅ New | Documents backend completion work |
-| 9 | `09_React_Frontend_Setup.md` | React + Vite | 📝 Planned | Write after Phase 2 scaffold |
-| 10 | `10_Owner_Dashboard.md` | Dashboard pages | 📝 Planned | After login, business, products UI |
-| 11 | `11_i18n_Multi_Language.md` | Telugu, Hindi, English | 📝 Planned | After i18n wired up |
-| 12 | `12_Customer_Storefront.md` | Public shop | 📝 Planned | Phase 3 |
-| 13 | `13_WhatsApp_Integration.md` | Order notifications | 📝 Planned | Phase 5 |
+| 8 | `08_Backend_Production_Ready.md` | Security & hardening | ✅ Current | Documents backend completion work |
+| 9 | `09_React_Frontend_Setup.md` | React + Vite scaffold | ✅ Current | Sprint 1 Step 1–2: scaffold, login, register, UI polish |
+| 10 | `10_Owner_Dashboard.md` | Owner dashboard pages | ✅ Current | Sprint 1 complete: business, products, orders |
+| 11 | `11_i18n_Multi_Language.md` | Telugu, Hindi, English | ⚠️ Partial | i18n wired in Sprint 1; dedicated chapter not written yet |
+| 12 | `12_Customer_Storefront.md` | Public shop | 📝 Planned | Sprint 2 |
+| 13 | `13_WhatsApp_Integration.md` | Order notifications | 📝 Planned | Sprint 2+ |
 
 **Legend:** ✅ Current | ⚠️ Needs small update | 📝 Not written yet
+
+---
+
+## Sprint 1 — what we completed
+
+| Step | What | Chapter |
+|------|------|---------|
+| Backend | Auth, business, products, orders APIs | Chapters 3–8 |
+| Frontend Step 1 | Vite scaffold, routes, Redux auth, i18n shell | Chapter 9 |
+| Frontend Step 2 | Login, register, AuthLayout, PasswordInput | Chapter 9 |
+| Frontend Step 3 | Business setup (create + edit) | Chapter 10 |
+| Frontend Step 4 | Products CRUD, image upload, CSV bulk import | Chapter 10 |
+| Frontend Step 5 | Orders list, status update, delete | Chapter 10 |
 
 ---
 
@@ -30,22 +45,22 @@ Use this file to see which chapters are done, outdated, or planned.
 
 After each **completed module**, we add or refresh one chapter:
 
-1. What we built  
-2. Why we built it that way  
-3. How data flows (browser → API → DB)  
-4. Key files and what each line does  
+1. What we built
+2. Why we built it that way
+3. How data flows (browser → API → DB)
+4. Key files and what each line does
 
 ---
 
 ## Priority updates (recommended order)
 
-1. **Chapter 8** — Backend production hardening (done in repo, now documented)  
-2. **Chapter 9** — After frontend scaffold (Phase 2.1)  
-3. **Patch chapters 3, 4, 5, 6, 7** — Short “Updates” sections at bottom (optional, when you review)  
+1. **Chapter 11** — Dedicated i18n chapter (keys already in `en.json`, `te.json`, `hi.json`)
+2. **Chapter 12** — Customer storefront (Sprint 2)
+3. **Patch chapters 3, 4, 5, 6, 7** — Short “Updates” sections at bottom (optional, when you review)
 
 ---
 
 ## Related docs
 
-- `PRODUCT_VISION.md` — Startup goals, tiers, roadmap  
-- `backend/.env.example` — Required environment variables  
+- `PRODUCT_VISION.md` — Startup goals, tiers, roadmap
+- `backend/.env.example` — Required environment variables

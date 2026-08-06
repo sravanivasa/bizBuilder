@@ -7,16 +7,26 @@ const validateObjectId = require("../middleware/validateObjectId");
 
 const {
     createProductValidation,
-    updateProductValidation
+    updateProductValidation,
+    bulkCreateProductsValidation
 } = require("../validators/productValidator");
 
 const {
     createProduct,
+    bulkCreateProducts,
     getProductsByBusiness,
     getProductById,
     updateProduct,
     deleteProduct
 } = require("../controllers/productController");
+
+router.post(
+    "/:businessId/bulk",
+    authMiddleware,
+    validateObjectId("businessId"),
+    ...bulkCreateProductsValidation,
+    bulkCreateProducts
+);
 
 router.post(
     "/:businessId",

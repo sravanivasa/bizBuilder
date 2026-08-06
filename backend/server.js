@@ -48,8 +48,8 @@ app.use(
     })
 );
 
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(sanitizeInput);
 app.use(hpp());
 
@@ -64,6 +64,13 @@ app.use("/api/orders", orderRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use((error, req, res, next) => {
+    if (error.type === "entity.too.large") {
+        return res.status(413).json({
+            success: false,
+            message: "Request body is too large. Try importing in smaller batches."
+        });
+    }
+
     if (error.name === "MulterError") {
         const message =
             error.code === "LIMIT_FILE_SIZE"
