@@ -2,7 +2,7 @@
 
 Use this file to see which chapters are done, outdated, or planned.
 
-**Last updated:** Sprint 1 complete (owner dashboard)
+**Last updated:** Sprint 2C ready (deployment docs + config)
 
 ---
 
@@ -21,8 +21,9 @@ Use this file to see which chapters are done, outdated, or planned.
 | 9 | `09_React_Frontend_Setup.md` | React + Vite scaffold | ✅ Current | Sprint 1 Step 1–2: scaffold, login, register, UI polish |
 | 10 | `10_Owner_Dashboard.md` | Owner dashboard pages | ✅ Current | Sprint 1 complete: business, products, orders |
 | 11 | `11_i18n_Multi_Language.md` | Telugu, Hindi, English | ⚠️ Partial | i18n wired in Sprint 1; dedicated chapter not written yet |
-| 12 | `12_Customer_Storefront.md` | Public shop | 📝 Planned | Sprint 2 |
-| 13 | `13_WhatsApp_Integration.md` | Order notifications | 📝 Planned | Sprint 2+ |
+| 12 | `12_Customer_Storefront.md` | Public shop | ✅ Current | Sprint 2A: public APIs, storefront, copy link |
+| 13 | `13_WhatsApp_Notifications.md` | Order notifications | ✅ Current | Sprint 2B: Meta Cloud API, owner + customer alerts |
+| 14 | `14_Deploy_MVP.md` | Production deploy | ✅ Current | Sprint 2C: Vercel + Railway, env vars, health check |
 
 **Legend:** ✅ Current | ⚠️ Needs small update | 📝 Not written yet
 
@@ -55,12 +56,12 @@ After each **completed module**, we add or refresh one chapter:
 ## Priority updates (recommended order)
 
 1. **Chapter 11** — Dedicated i18n chapter (keys already in `en.json`, `te.json`, `hi.json`)
-2. **Chapter 12** — Customer storefront (Sprint 2)
-3. **Patch chapters 3, 4, 5, 6, 7** — Short “Updates” sections at bottom (optional, when you review)
+2. **Patch chapters 3, 4, 5, 6, 7** — Short “Updates” sections at bottom (optional, when you review)
 
 ---
 
 ## Related docs
 
 - `PRODUCT_VISION.md` — Startup goals, tiers, roadmap
+- `DEPLOYMENT.md` — Step-by-step Vercel + Railway deploy checklist
 - `backend/.env.example` — Required environment variables

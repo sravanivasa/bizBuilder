@@ -9,11 +9,18 @@ import ForgotPassword from "./pages/ForgotPassword";
 import BusinessSetup from "./pages/BusinessSetup";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
+import Storefront from "./pages/Storefront";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const App = () => {
     return (
         <BrowserRouter>
             <Routes>
+                <Route path="/store/:businessId" element={<Storefront />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+
                 <Route element={<AuthLayout />}>
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />

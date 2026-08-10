@@ -20,6 +20,7 @@ const userRoutes = require("./routes/userRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const publicRoutes = require("./routes/publicRoutes");
 const errorHandler = require("./middleware/errorMiddleware");
 
 validateEnv();
@@ -57,10 +58,15 @@ app.get("/", (req, res) => {
     res.send("Backend + MongoDB Ready");
 });
 
+app.get("/api/health", (req, res) => {
+    res.status(200).json({ success: true, message: "OK" });
+});
+
 app.use("/api/users", userRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/public", publicRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use((error, req, res, next) => {

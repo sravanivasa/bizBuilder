@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { getMyBusinesses } from "../api/business";
+import { getMyOrders } from "../api/orders";
+import { getProductsByBusiness } from "../api/products";
 
 const cards = [
     {
@@ -28,32 +30,113 @@ const cards = [
     }
 ];
 
-const stats = [
-    { labelKey: "statTodayOrders", value: "0", icon: "📋" },
-    { labelKey: "statProducts", value: "0", icon: "📦" },
-    { labelKey: "statPending", value: "0", icon: "⏳" }
+const statCards = [
+    { key: "todayOrders", labelKey: "statTodayOrders", icon: "📋" },
+    { key: "products", labelKey: "statProducts", icon: "📦" },
+    { key: "pending", labelKey: "statPending", icon: "⏳" }
 ];
+
+const isToday = (dateValue) => {
+    if (!dateValue) {
+        return false;
+    }
+
+    const date = new Date(dateValue);
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+};
 
 const Dashboard = () => {
     const { t } = useTranslation();
+    const location = useLocation();
     const user = useSelector((state) => state.auth.user);
     const [businessName, setBusinessName] = useState("");
+    const [businessId, setBusinessId] = useState(null);
+    const [copySuccess, setCopySuccess] = useState(false);
+    const [stats, setStats] = useState({ todayOrders: 0, products: 0, pending: 0 });
+    const [statsLoading, setStatsLoading] = useState(true);
+
+    const loadDashboard = useCallback(async () => {
+        setStatsLoading(true);
+
+        try {
+            const { data } = await getMyBusinesses();
+            const business = data.businesses?.[0];
+
+            if (business?.businessName) {
+                setBusinessName(business.businessName);
+            }
+            if (business?._id) {
+                setBusinessId(business._id);
+            } else {
+                setBusinessId(null);
+            }
+
+            const [ordersRes, productsRes] = await Promise.all([
+                getMyOrders(),
+                business?._id
+                    ? getProductsByBusiness(business._id)
+                    : Promise.resolve({ data: { products: [] } })
+            ]);
+
+            const orders = ordersRes.data.orders || [];
+            const products = productsRes.data.products || [];
+
+            setStats({
+                todayOrders: orders.filter((order) => isToday(order.createdAt)).length,
+                products: products.length,
+                pending: orders.filter((order) => order.orderStatus === "Pending").length
+            });
+        } catch {
+            // Dashboard still works without live stats.
+        } finally {
+            setStatsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
-        const loadBusiness = async () => {
-            try {
-                const { data } = await getMyBusinesses();
-                const business = data.businesses?.[0];
-                if (business?.businessName) {
-                    setBusinessName(business.businessName);
-                }
-            } catch {
-                // Dashboard still works without business data.
-            }
-        };
+        loadDashboard();
+    }, [loadDashboard, location.pathname]);
 
-        loadBusiness();
-    }, []);
+    const copyTextToClipboard = async (text) => {
+        if (navigator.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch {
+                // Fall back to execCommand below.
+            }
+        }
+
+        try {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            return copied;
+        } catch {
+            return false;
+        }
+    };
+
+    const handleCopyStoreLink = async () => {
+        if (!businessId) {
+            return;
+        }
+
+        const storeUrl = `${window.location.origin}/store/${businessId}`;
+        const copied = await copyTextToClipboard(storeUrl);
+
+        if (copied) {
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2500);
+        }
+    };
 
     return (
         <section className="space-y-6">
@@ -85,20 +168,36 @@ const Dashboard = () => {
                     >
                         {t("addProducts")}
                     </Link>
+                    {businessId && (
+                        <button
+                            type="button"
+                            onClick={handleCopyStoreLink}
+                            className="rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+                        >
+                            {copySuccess ? t("storeLinkCopied") : t("copyStoreLink")}
+                        </button>
+                    )}
                 </div>
+                {copySuccess && (
+                    <p className="mt-3 text-sm text-emerald-300">{t("storeLinkCopied")}</p>
+                )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-                {stats.map((stat) => (
+                {statCards.map((stat) => (
                     <div
-                        key={stat.labelKey}
+                        key={stat.key}
                         className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-xl"
                     >
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-emerald-100/70">{t(stat.labelKey)}</p>
                             <span className="text-xl">{stat.icon}</span>
                         </div>
-                        <p className="mt-3 text-3xl font-bold text-white">{stat.value}</p>
+                        {statsLoading ? (
+                            <div className="mt-3 h-9 w-16 animate-pulse rounded-lg bg-white/10" />
+                        ) : (
+                            <p className="mt-3 text-3xl font-bold text-white">{stats[stat.key]}</p>
+                        )}
                     </div>
                 ))}
             </div>

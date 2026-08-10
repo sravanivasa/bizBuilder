@@ -20,6 +20,16 @@ const orderSchema = new mongoose.Schema(
             trim: true
         },
 
+        isWhatsAppSameAsPhone: {
+            type: Boolean,
+            default: true
+        },
+
+        customerWhatsApp: {
+            type: String,
+            trim: true
+        },
+
         customerAddress: {
             type: String,
             required: true,

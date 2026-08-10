@@ -563,6 +563,7 @@ const Orders = () => {
                             placeholder={t("orderSearchPlaceholder")}
                             className={inputClassName}
                         />
+                        <p className="mt-2 text-xs text-emerald-50/60">{t("ordersWhatsAppNote")}</p>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-emerald-50/70">

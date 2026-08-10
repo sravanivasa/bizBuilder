@@ -67,6 +67,16 @@ const AuthLayout = () => {
                             </div>
                             <Outlet />
                         </div>
+
+                        <p className="mt-6 text-center text-xs text-emerald-100/50">
+                            <Link to="/privacy" className="hover:text-emerald-200">
+                                {t("privacyPolicy")}
+                            </Link>
+                            {" · "}
+                            <Link to="/terms" className="hover:text-emerald-200">
+                                {t("termsOfService")}
+                            </Link>
+                        </p>
                     </div>
                 </main>
             </div>

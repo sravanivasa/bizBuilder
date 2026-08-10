@@ -46,6 +46,12 @@
  *         customerPhone:
  *           type: string
  *           example: "9876543210"
+ *         isWhatsAppSameAsPhone:
+ *           type: boolean
+ *           default: true
+ *         customerWhatsApp:
+ *           type: string
+ *           example: "9876543210"
  *         customerAddress:
  *           type: string
  *           example: 12 MG Road, Hyderabad, Telangana

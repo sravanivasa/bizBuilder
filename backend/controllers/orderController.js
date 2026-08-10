@@ -1,10 +1,13 @@
 const Order = require("../models/Orders");
 const Business = require("../models/Business");
-const Product = require("../models/Product");
 const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
-const aggregateOrderProducts = require("../utils/aggregateOrderProducts");
-const { decrementStock, restoreStock } = require("../utils/orderInventory");
+const { createOrderForBusiness } = require("../utils/processOrderCreation");
+const { restoreStock } = require("../utils/orderInventory");
+const {
+    notifyCustomerOrderConfirmed,
+    notifyCustomerOrderDelivered
+} = require("../services/whatsappService");
 
 const TERMINAL_ORDER_STATUSES = ["Delivered", "Cancelled", "Completed"];
 const DELETABLE_ORDER_STATUSES = ["Pending", "Cancelled"];
@@ -44,54 +47,13 @@ const createOrder = asyncHandler(async (req, res) => {
         });
     }
 
-    const aggregatedProducts = aggregateOrderProducts(products);
-    const orderProducts = [];
-    let totalAmount = 0;
-
-    for (const item of aggregatedProducts) {
-        const product = await Product.findById(item.product);
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: "Product not found"
-            });
-        }
-
-        if (product.business.toString() !== businessId) {
-            return res.status(400).json({
-                success: false,
-                message: `${product.productName} does not belong to this business`
-            });
-        }
-
-        if (item.quantity > product.stock) {
-            return res.status(400).json({
-                success: false,
-                message: `${product.productName} is out of stock`
-            });
-        }
-
-        totalAmount += product.price * item.quantity;
-        orderProducts.push({
-            product: product._id,
-            quantity: item.quantity,
-            price: product.price
-        });
-    }
-
-    let decrementedItems = [];
-
     try {
-        decrementedItems = await decrementStock(aggregatedProducts);
-
-        const order = await Order.create({
-            business: businessId,
+        const order = await createOrderForBusiness({
+            businessId,
             customerName,
             customerPhone,
             customerAddress,
-            products: orderProducts,
-            totalAmount,
+            products,
             paymentMethod
         });
 
@@ -101,11 +63,13 @@ const createOrder = asyncHandler(async (req, res) => {
             order
         });
     } catch (error) {
-        if (decrementedItems.length) {
-            await restoreStock(decrementedItems);
-        }
+        const statusCode = error.statusCode || 500;
+        const message = error.statusCode ? error.message : "Could not place order";
 
-        throw error;
+        return res.status(statusCode).json({
+            success: false,
+            message
+        });
     }
 });
 
@@ -212,6 +176,12 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
     order.orderStatus = nextStatus;
     await order.save();
+
+    if (nextStatus === "Confirmed") {
+        notifyCustomerOrderConfirmed(order, business);
+    } else if (nextStatus === "Delivered") {
+        notifyCustomerOrderDelivered(order, business);
+    }
 
     res.status(200).json({
         success: true,
