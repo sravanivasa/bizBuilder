@@ -1,3 +1,7 @@
+# Mongoose 9 / bson 7 require Node >= 20.12 (process.getBuiltinModule).
+[variables]
+NODE_VERSION = "22"
+
 # Used when builder is NIXPACKS (dashboard override). Express API has no compile step.
 [phases.build]
 cmds = []
