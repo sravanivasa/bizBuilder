@@ -98,14 +98,17 @@ const PORT = process.env.PORT || 5000;
 let server;
 
 const startServer = async () => {
+    server = app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+
     try {
         await connectDB();
-        server = app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
     } catch (error) {
-        console.error("Failed to start server:", error.message);
-        process.exit(1);
+        console.error("MongoDB connection failed:", error.message);
+        console.error(
+            "Server is up for health checks; fix MONGODB_URI or Atlas network access."
+        );
     }
 };
 
