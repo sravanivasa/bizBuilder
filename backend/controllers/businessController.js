@@ -4,6 +4,7 @@ const Order = require("../models/Orders");
 const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
 const pickFields = require("../utils/pickFields");
+const { generateSlug, ensureUniqueSlug } = require("../utils/generateSlug");
 
 const BUSINESS_FIELDS = [
     "businessName",
@@ -26,8 +27,13 @@ const createBusiness = asyncHandler(async (req, res) => {
         });
     }
 
+    const businessFields = pickFields(req.body, BUSINESS_FIELDS);
+    const baseSlug = generateSlug(businessFields.businessName);
+    const slug = await ensureUniqueSlug(Business, baseSlug);
+
     const business = await Business.create({
-        ...pickFields(req.body, BUSINESS_FIELDS),
+        ...businessFields,
+        slug,
         owner: req.user._id
     });
 
@@ -91,14 +97,18 @@ const updateBusiness = asyncHandler(async (req, res) => {
         });
     }
 
-    const updatedBusiness = await Business.findByIdAndUpdate(
-        req.params.id,
-        pickFields(req.body, BUSINESS_FIELDS),
-        {
-            new: true,
-            runValidators: true
-        }
-    );
+    const updates = pickFields(req.body, BUSINESS_FIELDS);
+
+    if (!business.slug) {
+        const nameForSlug = updates.businessName || business.businessName;
+        const baseSlug = generateSlug(nameForSlug);
+        updates.slug = await ensureUniqueSlug(Business, baseSlug, business._id);
+    }
+
+    const updatedBusiness = await Business.findByIdAndUpdate(req.params.id, updates, {
+        new: true,
+        runValidators: true
+    });
 
     res.status(200).json({
         success: true,

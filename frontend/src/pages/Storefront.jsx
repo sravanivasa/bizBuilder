@@ -8,6 +8,7 @@ import {
     formatIndianPhone,
     validateCheckoutForm
 } from "../utils/checkoutValidation";
+import { saveCustomerOrder, getStorePath } from "../utils/customerOrdersStorage";
 
 const inputClassName =
     "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-emerald-100/60 outline-none transition focus:border-emerald-300 focus:bg-white/15 focus:ring-2 focus:ring-emerald-400/30";
@@ -77,7 +78,7 @@ const LoadingSkeleton = () => (
 );
 
 const Storefront = () => {
-    const { businessId } = useParams();
+    const { storeSlug } = useParams();
     const { t } = useTranslation();
 
     const [business, setBusiness] = useState(null);
@@ -94,6 +95,7 @@ const Storefront = () => {
     const [touched, setTouched] = useState({});
     const [placingOrder, setPlacingOrder] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(null);
+    const [linkCopied, setLinkCopied] = useState(false);
 
     const loadStore = useCallback(async () => {
         setLoading(true);
@@ -101,8 +103,8 @@ const Storefront = () => {
 
         try {
             const [businessRes, productsRes] = await Promise.all([
-                getPublicBusiness(businessId),
-                getPublicProducts(businessId)
+                getPublicBusiness(storeSlug),
+                getPublicProducts(storeSlug)
             ]);
 
             setBusiness(businessRes.data.business);
@@ -112,7 +114,7 @@ const Storefront = () => {
         } finally {
             setLoading(false);
         }
-    }, [businessId, t]);
+    }, [storeSlug, t]);
 
     useEffect(() => {
         loadStore();
@@ -247,9 +249,26 @@ const Storefront = () => {
                 }))
             };
 
-            const { data } = await createPublicOrder(businessId, payload);
+            const { data } = await createPublicOrder(storeSlug, payload);
 
-            setOrderSuccess(data.order);
+            saveCustomerOrder({
+                businessId: business?._id,
+                businessSlug: business?.slug,
+                orderId: data.order._id,
+                shortOrderId: data.order._id?.slice(-6).toUpperCase(),
+                trackingToken: data.order.trackingToken,
+                phone: data.order.customerPhone,
+                businessName: business?.businessName,
+                totalAmount: data.order.totalAmount,
+                createdAt: data.order.createdAt,
+                orderStatus: data.order.orderStatus
+            });
+
+            setOrderSuccess({
+                order: data.order,
+                trackingUrl: data.trackingUrl,
+                whatsappEnabled: data.whatsappEnabled
+            });
             setCart({});
             setCheckout(EMPTY_CHECKOUT);
             setFieldErrors({});
@@ -287,6 +306,23 @@ const Storefront = () => {
     }
 
     if (orderSuccess) {
+        const { order, trackingUrl, whatsappEnabled } = orderSuccess;
+        const storePath = getStorePath(business?._id, business?.slug) || `/store/${storeSlug}`;
+        const trackPath = order.trackingToken
+            ? `${storePath}/track/${order.trackingToken}`
+            : `${storePath}/track?orderId=${order._id?.slice(-6).toUpperCase()}&phone=${encodeURIComponent(order.customerPhone || "")}`;
+        const fullTrackLink = trackingUrl || `${window.location.origin}${trackPath}`;
+
+        const handleCopyTrackLink = async () => {
+            try {
+                await navigator.clipboard.writeText(fullTrackLink);
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2000);
+            } catch {
+                // ignore clipboard errors
+            }
+        };
+
         return (
             <StoreShell businessName={business?.businessName}>
                 <div className="relative mx-auto max-w-lg overflow-hidden rounded-3xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/20 via-white/5 to-teal-500/10 p-8 text-center shadow-2xl shadow-emerald-500/10 backdrop-blur-xl sm:p-10">
@@ -301,18 +337,50 @@ const Storefront = () => {
                         </h2>
                         <p className="mt-3 text-sm leading-6 text-emerald-50/80">
                             {t("storefrontOrderSuccessMessage", {
-                                id: orderSuccess._id?.slice(-6).toUpperCase()
+                                id: order._id?.slice(-6).toUpperCase()
                             })}
                         </p>
                         <p className="mt-4 text-lg font-semibold text-white">
-                            {t("totalAmount")}: {formatPrice(orderSuccess.totalAmount)}
+                            {t("totalAmount")}: {formatPrice(order.totalAmount)}
                         </p>
-                        <p className="mt-2 text-sm text-emerald-100/70">
-                            {t("storefrontOrderSuccessNext")}
-                        </p>
+                        {whatsappEnabled ? (
+                            <p className="mt-3 text-sm text-emerald-100/80">
+                                {t("storefrontOrderSuccessWhatsApp")}
+                            </p>
+                        ) : (
+                            <p className="mt-2 text-sm text-emerald-100/70">
+                                {t("storefrontOrderSuccessCopyLink")}
+                            </p>
+                        )}
+                        <div className="mt-4 flex flex-col gap-2">
+                            <button
+                                type="button"
+                                onClick={handleCopyTrackLink}
+                                className="inline-flex justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+                            >
+                                {linkCopied ? t("storefrontTrackLinkCopied") : t("storefrontCopyTrackLink")}
+                            </button>
+                        </div>
+                        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                            <Link
+                                to={`${storePath}/my-orders`}
+                                className="inline-flex justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:from-emerald-400 hover:to-teal-400"
+                            >
+                                {t("storefrontViewMyOrders")}
+                            </Link>
+                            <Link
+                                to={trackPath}
+                                className="inline-flex justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+                            >
+                                {t("storefrontTrackOrder")}
+                            </Link>
+                        </div>
                         <button
                             type="button"
-                            onClick={() => setOrderSuccess(null)}
+                            onClick={() => {
+                                setOrderSuccess(null);
+                                setLinkCopied(false);
+                            }}
                             className="mt-8 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:from-emerald-400 hover:to-teal-400"
                         >
                             {t("storefrontOrderAgain")}
@@ -750,8 +818,9 @@ const Storefront = () => {
 };
 
 const StoreShell = ({ businessName, children }) => {
-    const { businessId } = useParams();
+    const { storeSlug } = useParams();
     const { t } = useTranslation();
+    const storePath = storeSlug ? `/store/${storeSlug}` : "/";
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-slate-950">
@@ -763,8 +832,8 @@ const StoreShell = ({ businessName, children }) => {
             </div>
 
             <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:pb-8 lg:px-8">
-                <div className="mb-8 flex items-center justify-between">
-                    <Link to={businessId ? `/store/${businessId}` : "/"} className="inline-flex items-center gap-2 transition hover:opacity-80">
+                <div className="mb-8 flex items-center justify-between gap-4">
+                    <Link to={storePath} className="inline-flex items-center gap-2 transition hover:opacity-80">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 font-bold text-white shadow-lg shadow-emerald-500/30">
                             B
                         </span>
@@ -772,7 +841,25 @@ const StoreShell = ({ businessName, children }) => {
                             {businessName || t("appName")}
                         </span>
                     </Link>
-                    <LanguageSwitcher variant="auth" />
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {storeSlug && (
+                            <>
+                                <Link
+                                    to={`${storePath}/my-orders`}
+                                    className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition hover:bg-white/20 sm:text-sm"
+                                >
+                                    {t("storefrontMyOrdersLink")}
+                                </Link>
+                                <Link
+                                    to={`${storePath}/track`}
+                                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-500/20 sm:text-sm"
+                                >
+                                    {t("storefrontTrackOrderLink")}
+                                </Link>
+                            </>
+                        )}
+                        <LanguageSwitcher variant="auth" />
+                    </div>
                 </div>
 
                 {children}

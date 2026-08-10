@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { generateSlug, ensureUniqueSlug } = require("../utils/generateSlug");
 
 const businessSchema = new mongoose.Schema(
     {
@@ -6,6 +7,13 @@ const businessSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true
+        },
+        slug: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            unique: true,
+            sparse: true
         },
         category: {
             type: String,
@@ -51,5 +59,14 @@ const businessSchema = new mongoose.Schema(
 );
 
 businessSchema.index({ owner: 1 });
+businessSchema.index({ slug: 1 }, { unique: true, sparse: true });
+
+businessSchema.pre("save", async function ensureSlug(next) {
+    if (!this.slug && this.businessName) {
+        const baseSlug = generateSlug(this.businessName);
+        this.slug = await ensureUniqueSlug(this.constructor, baseSlug, this._id);
+    }
+    next();
+});
 
 module.exports = mongoose.model("Business", businessSchema);

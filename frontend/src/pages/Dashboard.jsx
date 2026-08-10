@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { getMyBusinesses } from "../api/business";
 import { getMyOrders } from "../api/orders";
-import { getProductsByBusiness } from "../api/products";
 
 const cards = [
     {
@@ -31,10 +30,13 @@ const cards = [
 ];
 
 const statCards = [
-    { key: "todayOrders", labelKey: "statTodayOrders", icon: "📋" },
-    { key: "products", labelKey: "statProducts", icon: "📦" },
-    { key: "pending", labelKey: "statPending", icon: "⏳" }
+    { key: "todayOrders", labelKey: "statTodayOrders", icon: "📋", isCurrency: false },
+    { key: "todayRevenue", labelKey: "statTodayRevenue", icon: "💰", isCurrency: true },
+    { key: "monthRevenue", labelKey: "statMonthRevenue", icon: "📈", isCurrency: true },
+    { key: "pending", labelKey: "statPending", icon: "⏳", isCurrency: false }
 ];
+
+const formatCurrency = (value) => `₹${Number(value).toLocaleString("en-IN")}`;
 
 const isToday = (dateValue) => {
     if (!dateValue) {
@@ -46,14 +48,38 @@ const isToday = (dateValue) => {
     return date.toDateString() === today.toDateString();
 };
 
+const isCurrentMonth = (dateValue) => {
+    if (!dateValue) {
+        return false;
+    }
+
+    const date = new Date(dateValue);
+    const today = new Date();
+    return (
+        date.getFullYear() === today.getFullYear() &&
+        date.getMonth() === today.getMonth()
+    );
+};
+
+const sumRevenue = (orders, filterFn) =>
+    orders
+        .filter((order) => order.orderStatus !== "Cancelled" && filterFn(order))
+        .reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+
 const Dashboard = () => {
     const { t } = useTranslation();
     const location = useLocation();
     const user = useSelector((state) => state.auth.user);
     const [businessName, setBusinessName] = useState("");
     const [businessId, setBusinessId] = useState(null);
+    const [businessSlug, setBusinessSlug] = useState(null);
     const [copySuccess, setCopySuccess] = useState(false);
-    const [stats, setStats] = useState({ todayOrders: 0, products: 0, pending: 0 });
+    const [stats, setStats] = useState({
+        todayOrders: 0,
+        todayRevenue: 0,
+        monthRevenue: 0,
+        pending: 0
+    });
     const [statsLoading, setStatsLoading] = useState(true);
 
     const loadDashboard = useCallback(async () => {
@@ -71,20 +97,19 @@ const Dashboard = () => {
             } else {
                 setBusinessId(null);
             }
+            if (business?.slug) {
+                setBusinessSlug(business.slug);
+            } else {
+                setBusinessSlug(null);
+            }
 
-            const [ordersRes, productsRes] = await Promise.all([
-                getMyOrders(),
-                business?._id
-                    ? getProductsByBusiness(business._id)
-                    : Promise.resolve({ data: { products: [] } })
-            ]);
-
+            const ordersRes = await getMyOrders();
             const orders = ordersRes.data.orders || [];
-            const products = productsRes.data.products || [];
 
             setStats({
                 todayOrders: orders.filter((order) => isToday(order.createdAt)).length,
-                products: products.length,
+                todayRevenue: sumRevenue(orders, (order) => isToday(order.createdAt)),
+                monthRevenue: sumRevenue(orders, (order) => isCurrentMonth(order.createdAt)),
                 pending: orders.filter((order) => order.orderStatus === "Pending").length
             });
         } catch {
@@ -129,7 +154,7 @@ const Dashboard = () => {
             return;
         }
 
-        const storeUrl = `${window.location.origin}/store/${businessId}`;
+        const storeUrl = `${window.location.origin}/store/${businessSlug || businessId}`;
         const copied = await copyTextToClipboard(storeUrl);
 
         if (copied) {
@@ -183,7 +208,7 @@ const Dashboard = () => {
                 )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {statCards.map((stat) => (
                     <div
                         key={stat.key}
@@ -196,7 +221,9 @@ const Dashboard = () => {
                         {statsLoading ? (
                             <div className="mt-3 h-9 w-16 animate-pulse rounded-lg bg-white/10" />
                         ) : (
-                            <p className="mt-3 text-3xl font-bold text-white">{stats[stat.key]}</p>
+                            <p className="mt-3 text-3xl font-bold text-white">
+                                {stat.isCurrency ? formatCurrency(stats[stat.key]) : stats[stat.key]}
+                            </p>
                         )}
                     </div>
                 ))}

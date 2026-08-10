@@ -1,4 +1,5 @@
 const Business = require("../models/Business");
+const { buildOrderTrackUrl } = require("../utils/orderTrackUrl");
 
 const DEFAULT_API_VERSION = "v21.0";
 
@@ -143,11 +144,225 @@ const notifyCustomerOrderDelivered = async (order, business) => {
     }
 };
 
+const notifyCustomerOrderPlaced = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            console.warn("[WhatsApp] Order has no customer phone, skipping placed alert");
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const trackUrl = buildOrderTrackUrl(order, business);
+        const trackLine = trackUrl ? `\n\nTrack your order: ${trackUrl}` : "";
+        const message = `Thank you! Your order #${orderId} from ${businessName} has been received. We will confirm it shortly. Total: ${formatAmount(order.totalAmount)}.${trackLine}`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (placed):", error.message);
+    }
+};
+
+const notifyCustomerOrderPreparing = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            console.warn("[WhatsApp] Order has no customer phone, skipping preparing alert");
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const message = `Your order #${orderId} from ${businessName} is being prepared. We will update you when it is ready.`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (preparing):", error.message);
+    }
+};
+
+const notifyCustomerOrderCancelled = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            console.warn("[WhatsApp] Order has no customer phone, skipping cancelled alert");
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const message = `Your order #${orderId} from ${businessName} has been cancelled. If you have questions, please contact the shop.`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (cancelled):", error.message);
+    }
+};
+
+const notifyCustomerReturnApproved = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            console.warn("[WhatsApp] Order has no customer phone, skipping return approved alert");
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const message = `Your return request for order #${orderId} from ${businessName} has been approved. Refund or pickup details will follow from the shop.`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (return approved):", error.message);
+    }
+};
+
+const notifyCustomerOrderProcessing = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const message = `Your order #${orderId} from ${businessName} is being processed. We will update you soon.`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (processing):", error.message);
+    }
+};
+
+const notifyCustomerOrderShipped = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const message = `Your order #${orderId} from ${businessName} has been shipped!`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (shipped):", error.message);
+    }
+};
+
+const notifyCustomerCourierTracking = async (order, business) => {
+    try {
+        if (!order.trackingId && !order.trackingUrl) {
+            return;
+        }
+
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const carrier = order.courierName ? `${order.courierName} ` : "";
+        const trackingLine = order.trackingUrl
+            ? `\n\nTrack: ${order.trackingUrl}`
+            : order.trackingId
+              ? `\n\nTracking ID: ${order.trackingId}`
+              : "";
+
+        const message = `Order #${orderId} from ${businessName} — ${carrier}tracking updated.${trackingLine}`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (courier tracking):", error.message);
+    }
+};
+
+const notifyCustomerOutForDelivery = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const isPickup = order.deliveryType === "pickup";
+        const message = isPickup
+            ? `Your order #${orderId} from ${businessName} is ready for pickup at the shop.`
+            : `Your order #${orderId} from ${businessName} is out for delivery.`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (out for delivery):", error.message);
+    }
+};
+
+const notifyCustomerDeliveryOtp = async (order, business) => {
+    try {
+        if (!order.deliveryOtp) {
+            return;
+        }
+
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const isPickup = order.deliveryType === "pickup";
+        const action = isPickup ? "pickup" : "delivery";
+        const message = `Your ${action} OTP for order #${orderId} from ${businessName} is: ${order.deliveryOtp}. Share this with the delivery person only when you receive your order.`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (delivery OTP):", error.message);
+    }
+};
+
+const notifyDeliveryPersonLink = async (order, business, deliveryUrl) => {
+    try {
+        if (!order.deliveryPersonPhone || !deliveryUrl) {
+            return;
+        }
+
+        const businessName = business?.businessName || "Shop";
+        const orderId = shortOrderId(order);
+        const message = `New delivery assignment from ${businessName} — Order #${orderId}.\n\nOpen delivery page: ${deliveryUrl}\n\nCustomer: ${order.customerName}, ${order.customerPhone}\nAddress: ${order.customerAddress}`;
+
+        await sendWhatsAppMessage(order.deliveryPersonPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify delivery person:", error.message);
+    }
+};
+
 module.exports = {
     normalizePhoneNumber,
     isConfigured,
     sendWhatsAppMessage,
     notifyOwnerNewOrder,
+    notifyCustomerOrderPlaced,
     notifyCustomerOrderConfirmed,
-    notifyCustomerOrderDelivered
+    notifyCustomerOrderPreparing,
+    notifyCustomerOrderDelivered,
+    notifyCustomerOrderCancelled,
+    notifyCustomerReturnApproved,
+    notifyCustomerOrderProcessing,
+    notifyCustomerOrderShipped,
+    notifyCustomerOutForDelivery,
+    notifyCustomerDeliveryOtp,
+    notifyDeliveryPersonLink,
+    notifyCustomerCourierTracking
 };

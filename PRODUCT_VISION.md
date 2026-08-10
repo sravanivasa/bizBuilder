@@ -172,9 +172,144 @@ Custom domain can wait.
 
 ---
 
-## Sprint 3+ (later)
+## Sprint 2 Complete ✅
 
-These are valuable but **not** needed for first real users:
+**Status:** Done — storefront, WhatsApp notifications, deployment prep.
+
+| Phase | What was built |
+|-------|----------------|
+| **2A** | Public storefront (`/store/:slug`), customer checkout, shareable store link |
+| **2B** | WhatsApp alerts — new order (owner), placed / confirmed / delivered (customer) |
+| **2C** | Deploy MVP — Vercel + Railway config, `DEPLOYMENT.md`, health check, legal placeholders |
+
+---
+
+## Sprint 3 Complete ✅
+
+**Status:** Done — revenue dashboard, order tracking, returns, expanded WhatsApp.
+
+| Feature | What was built |
+|---------|----------------|
+| **Dashboard revenue** | Today's / month sales stat cards |
+| **Order tracking** | Secure token links, `/track/:token`, slug-based store URLs, My Orders (localStorage) |
+| **Returns** | Customer return request, owner approve/reject, stock restore |
+| **WhatsApp expansion** | Placed, Preparing, Cancelled, Return approved alerts |
+
+**Learning chapter:** `PROJECT_LEARNING_GUIDE.md/15_Sprint3_Features.md`
+
+---
+
+## Sprint 4: Delivery Module 🚚 (core differentiator)
+
+**Status:** In progress — phases 4A–4C and 4E complete; 4D bulk actions remaining.
+
+Home businesses deliver differently: some use a local delivery person, some ship via courier, some offer shop pickup. Generic shop builders treat every order the same. **BizBuilder's delivery module** lets the owner choose how each order goes out — with proof, tracking, and WhatsApp updates built in.
+
+### Why this matters
+
+| Pain for home sellers | BizBuilder delivery |
+|----------------------|---------------------|
+| "Did the delivery boy actually deliver?" | Photo proof + OTP confirmation |
+| "Customer keeps calling for courier status" | Tracking link sent on WhatsApp automatically |
+| "Pickup orders — how do I know it's the right person?" | OTP on pickup (same flow as delivery) |
+| Too many confusing statuses | Simplified: New → Processing → Shipped/Out for delivery → Delivered → Cancelled |
+
+### Four delivery routes
+
+| Route | `deliveryType` | Owner sets | Customer / delivery person sees |
+|-------|----------------|------------|-----------------------------------|
+| **1. Local delivery person** | `local` | Person name + phone → generates token link | Delivery person mobile page (`/deliver/:token`): address, items, photo upload, OTP entry |
+| **2. Courier / post** | `courier` | Carrier name + tracking ID | Status **Shipped**; customer sees tracking ID + external link (auto-built for known carriers) |
+| **3. OTP proof** | (all routes) | Auto when out for delivery | 4-digit OTP via WhatsApp to customer; delivery person enters OTP to mark **Delivered** |
+| **4. Pickup at shop** | `pickup` | Mark ready for pickup | Customer gets OTP on WhatsApp; staff enters OTP at handover → **Delivered** |
+
+### Simplified order statuses
+
+| Status | Meaning | Replaces (legacy) |
+|--------|---------|-------------------|
+| **New** | Order just placed | `Pending` |
+| **Processing** | Owner accepted, preparing | `Confirmed`, `Preparing` |
+| **Shipped** | Courier handed over | (new — courier only) |
+| **Out for delivery** | Local delivery person assigned | (new — local only) |
+| **Delivered** | Completed | `Delivered`, `Completed` |
+| **Cancelled** | Cancelled | `Cancelled` |
+
+Legacy statuses remain in the database for existing orders; API and UI map them for display.
+
+### Sprint 4 phases
+
+| Phase | Scope | Status |
+|-------|--------|--------|
+| **4A** | `deliveryType` field, courier tracking, owner delivery UI, customer track view | ✅ Done |
+| **4B** | Delivery person page + photo upload (Cloudinary) | ✅ Done |
+| **4C** | Delivery OTP generation + verify via WhatsApp | ✅ Done |
+| **4D** | Simplified statuses migration + bulk actions | ⚠️ Partial — new statuses + backward compat; bulk actions TBD |
+| **4E** | Delivery timeline on customer track page | ✅ Done |
+
+#### Phase 4A — Delivery type & courier tracking
+
+**Backend:**
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `PUT /api/orders/:id/delivery` | Owner JWT | Set `deliveryType`, courier info, assign delivery person |
+
+**Order model fields (4A):** `deliveryType` (`local` \| `courier` \| `pickup`), `courierName`, `trackingId`, `trackingUrl`
+
+**Frontend:** Owner `Orders.jsx` — per-order delivery type selector; courier carrier + tracking ID; mark Shipped.
+
+**Customer:** `TrackOrder` / `MyOrders` — show courier tracking ID + external link.
+
+#### Phase 4B — Delivery person page + photo
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /api/public/deliver/:deliveryToken` | None | Delivery person view (address, items) |
+| `POST /api/public/deliver/:deliveryToken/photo` | None | Upload delivery photo (multer → Cloudinary) |
+
+**Order fields:** `deliveryPersonName`, `deliveryPersonPhone`, `deliveryToken`, `deliveryPhoto`
+
+**Frontend:** `/deliver/:deliveryToken` — mobile-first page, no login.
+
+**WhatsApp:** Send delivery person link when local delivery assigned.
+
+#### Phase 4C — OTP proof
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `POST /api/public/deliver/:deliveryToken/verify-otp` | None | Verify OTP → mark Delivered |
+
+**Order fields:** `deliveryOtp`, `deliveryOtpExpiresAt`
+
+**Triggers:** Generate 4-digit OTP when status → Out for delivery (local) or ready for pickup.
+
+**WhatsApp:** OTP to customer; tracking info when courier shipped.
+
+#### Phase 4D — Status migration + bulk actions
+
+- Migrate display to simplified statuses; keep backward compat in DB
+- Owner bulk status update (e.g. mark multiple as Processing)
+
+#### Phase 4E — Delivery timeline
+
+**Order field:** `deliveryTimeline: [{ status, note, photo, at }]`
+
+Customer track page shows timeline of status updates, photos, and notes.
+
+### Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `FRONTEND_URL` | Base URL for delivery person links (`/deliver/:token`) and track links |
+| `CLOUDINARY_*` | Delivery photo upload (folder: `bizbuilder/delivery`) |
+
+**Learning chapter:** `PROJECT_LEARNING_GUIDE.md/16_Delivery_Module.md`
+
+---
+
+## Sprint 5+ (later)
+
+These are valuable but **not** needed until delivery module is stable:
 
 | Feature | Tier | Notes |
 |---------|------|--------|
@@ -224,6 +359,8 @@ Chapters live in `PROJECT_LEARNING_GUIDE.md/`. See `00_Chapter_Index.md` for ful
 | 12 | Customer storefront | ✅ Current — Sprint 2A |
 | 13 | WhatsApp integration | ✅ Current — Sprint 2B |
 | 14 | Production deployment | ✅ Current — Sprint 2C |
+| 15 | Sprint 3 features | ✅ Current — revenue, tracking, returns |
+| 16 | Delivery module | 🔄 In progress — Sprint 4 |
 
 **Policy:** After each completed module, add or refresh a chapter covering what we built, why, how data flows, and key MERN concepts. The assistant reminds the team when a module is done.
 
@@ -273,10 +410,17 @@ Part of Sprint 2, **after** the customer storefront is live.
 Sprint 1  Owner dashboard + i18n + products + orders     [DONE — 3d7e2bf]
 Sprint 2A Public storefront + share link + customer orders [DONE]
 Sprint 2B WhatsApp notifications (new / confirmed / delivered)      [DONE]
-Sprint 2C Deploy MVP (Vercel + Railway)              [READY — see DEPLOYMENT.md]
-Sprint 3+ Razorpay subscriptions
-Sprint 3+ AI daily social post suggestions
-Sprint 3+ Full website + custom domain (Pro)
+Sprint 2C Deploy MVP (Vercel + Railway)              [DONE — DEPLOYMENT.md]
+Sprint 3  Revenue, tracking, returns, WhatsApp expansion [DONE]
+Sprint 4  Delivery module (local / courier / pickup)   [IN PROGRESS]
+  4A      deliveryType, courier tracking, owner + track UI
+  4B      Delivery person page + photo upload
+  4C      OTP proof via WhatsApp
+  4D      Simplified statuses + bulk actions
+  4E      Delivery timeline on track page
+Sprint 5+ Razorpay subscriptions
+Sprint 5+ AI daily social post suggestions
+Sprint 5+ Full website + custom domain (Pro)
 Future    Voice assistant, CRM, expenses
 ```
 
@@ -319,7 +463,9 @@ Future    Voice assistant, CRM, expenses
 | Public storefront + share link | ✅ Done | Sprint 2A |
 | Customer phone + WhatsApp number on orders | ✅ Done | Sprint 2A checkout form |
 | WhatsApp notifications (new / confirmed / delivered) | ✅ Done | Sprint 2B — Meta Cloud API |
-| Deploy backend + frontend | ✅ Ready | Sprint 2C — config + `DEPLOYMENT.md`; user connects Vercel + Railway |
+| Deploy backend + frontend | ✅ Done | Sprint 2C — config + `DEPLOYMENT.md` |
+| Order tracking + returns | ✅ Done | Sprint 3 |
+| Delivery module (local / courier / pickup) | 🔄 In progress | Sprint 4 — see above |
 | HTTPS (SSL) | ✅ Auto | Vercel + Railway |
 | Privacy Policy + Terms of Service | ✅ Placeholder | `/privacy`, `/terms` — lawyer review before marketing |
 | Mobile-responsive UI | ✅ Done | Owner pages; extend to storefront in 2A |
@@ -385,3 +531,4 @@ Future    Voice assistant, CRM, expenses
 | 2026-08-05 | Initial vision: tiers, WhatsApp MVP, customer phone/WhatsApp fields, i18n, AI & voice deferred |
 | 2026-08-06 | Sprint 1 marked complete (3d7e2bf); Sprint 2 plan (2A storefront → 2B WhatsApp → 2C deploy); repo structure & learning guide chapters |
 | 2026-08-06 | Sprint 2C deployment prep: DEPLOYMENT.md, Vercel/Railway config, health check, legal placeholders, Chapter 14 |
+| 2026-08-10 | Sprint 2/3 marked complete; Sprint 4 Delivery Module documented (4A–4E); Chapter 16 stub |

@@ -67,4 +67,53 @@
  *           type: string
  *           enum: [Cash, Card, UPI]
  *           default: Cash
+ *     TrackedOrderItem:
+ *       type: object
+ *       properties:
+ *         productName: { type: string, example: Mango Pickle }
+ *         quantity: { type: integer, example: 2 }
+ *         price: { type: number, example: 199 }
+ *         lineTotal: { type: number, example: 398 }
+ *     TrackedOrder:
+ *       type: object
+ *       properties:
+ *         orderId: { type: string }
+ *         shortOrderId: { type: string, example: ABC123 }
+ *         orderStatus:
+ *           type: string
+ *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
+ *         returnStatus:
+ *           type: string
+ *           enum: [None, Requested, Approved, Rejected, Completed]
+ *         returnReason: { type: string }
+ *         totalAmount: { type: number, example: 598 }
+ *         paymentMethod: { type: string, enum: [Cash, Card, UPI] }
+ *         customerName: { type: string }
+ *         customerPhone:
+ *           type: string
+ *           description: Included only when tracking via secure token
+ *         items:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/TrackedOrderItem' }
+ *         createdAt: { type: string, format: date-time }
+ *         updatedAt: { type: string, format: date-time }
+ *         returnRequestedAt: { type: string, format: date-time }
+ *         returnResolvedAt: { type: string, format: date-time }
+ *         business: { $ref: '#/components/schemas/PublicBusiness' }
+ *     TrackedOrderResponse:
+ *       type: object
+ *       properties:
+ *         success: { type: boolean, example: true }
+ *         message: { type: string, example: Order tracked successfully }
+ *         order: { $ref: '#/components/schemas/TrackedOrder' }
+ *     ReturnRequestInput:
+ *       type: object
+ *       required: [phone]
+ *       properties:
+ *         phone:
+ *           type: string
+ *           example: "9876543210"
+ *         reason:
+ *           type: string
+ *           example: Product was damaged on delivery
  */

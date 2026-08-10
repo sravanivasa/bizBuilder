@@ -1,8 +1,15 @@
+const crypto = require("crypto");
 const Product = require("../models/Product");
 const Order = require("../models/Orders");
+const Business = require("../models/Business");
 const aggregateOrderProducts = require("./aggregateOrderProducts");
 const { decrementStock, restoreStock } = require("./orderInventory");
-const { notifyOwnerNewOrder } = require("../services/whatsappService");
+const {
+    notifyOwnerNewOrder,
+    notifyCustomerOrderPlaced
+} = require("../services/whatsappService");
+
+const generateTrackingToken = () => crypto.randomBytes(32).toString("hex");
 
 const buildOrderFromProducts = async (businessId, products) => {
     const aggregatedProducts = aggregateOrderProducts(products);
@@ -72,10 +79,14 @@ const createOrderForBusiness = async ({
             customerWhatsApp: resolvedWhatsApp,
             products: orderProducts,
             totalAmount,
-            paymentMethod
+            paymentMethod,
+            trackingToken: generateTrackingToken()
         });
 
+        const business = await Business.findById(businessId).select("businessName slug");
+
         notifyOwnerNewOrder(order, businessId);
+        notifyCustomerOrderPlaced(order, business);
 
         return order;
     } catch (error) {

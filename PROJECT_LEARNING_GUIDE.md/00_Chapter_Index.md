@@ -2,7 +2,7 @@
 
 Use this file to see which chapters are done, outdated, or planned.
 
-**Last updated:** Sprint 2C ready (deployment docs + config)
+**Last updated:** Sprint 4 in progress (delivery module)
 
 ---
 
@@ -12,7 +12,7 @@ Use this file to see which chapters are done, outdated, or planned.
 |---|------|--------|--------|--------|
 | 1 | `01_Project_Architecture.md` | Overall structure | ✅ Current | Matches repo layout |
 | 2 | `02_Express_Basics.md` | Express.js | ✅ Current | Core concepts still valid |
-| 3 | `03_MongoDB_Mongoose.md` | Database & models | ⚠️ Partial | Add indexes, User `role` field, Order `orderStatus` |
+| 3 | `03_MongoDB_Mongoose.md` | Database & models | ⚠️ Partial | Add delivery fields on Order model |
 | 4 | `04_JWT_Authentication.md` | Login & JWT | ⚠️ Partial | Add admin role, auth rate limit, 401 vs 403 |
 | 5 | `05_Validation.md` | express-validator | ⚠️ Partial | Business/order validators updated since writing |
 | 6 | `06_Middleware.md` | Middleware | ⚠️ Outdated | Says `mongo-sanitize` commented; we use `sanitizeInput.js` now |
@@ -22,8 +22,10 @@ Use this file to see which chapters are done, outdated, or planned.
 | 10 | `10_Owner_Dashboard.md` | Owner dashboard pages | ✅ Current | Sprint 1 complete: business, products, orders |
 | 11 | `11_i18n_Multi_Language.md` | Telugu, Hindi, English | ⚠️ Partial | i18n wired in Sprint 1; dedicated chapter not written yet |
 | 12 | `12_Customer_Storefront.md` | Public shop | ✅ Current | Sprint 2A: public APIs, storefront, copy link |
-| 13 | `13_WhatsApp_Notifications.md` | Order notifications | ✅ Current | Sprint 2B: Meta Cloud API, owner + customer alerts |
+| 13 | `13_WhatsApp_Notifications.md` | Order notifications | ⚠️ Partial | Sprint 3 + 4 delivery OTP — see Chapters 15–16 |
 | 14 | `14_Deploy_MVP.md` | Production deploy | ✅ Current | Sprint 2C: Vercel + Railway, env vars, health check |
+| 15 | `15_Sprint3_Features.md` | Revenue, tracking, returns | ✅ Current | Sprint 3: dashboard sales, track page, returns, WhatsApp |
+| 16 | `16_Delivery_Module.md` | Local / courier / pickup | 🔄 In progress | Sprint 4: delivery routes, OTP, timeline |
 
 **Legend:** ✅ Current | ⚠️ Needs small update | 📝 Not written yet
 
@@ -39,6 +41,29 @@ Use this file to see which chapters are done, outdated, or planned.
 | Frontend Step 3 | Business setup (create + edit) | Chapter 10 |
 | Frontend Step 4 | Products CRUD, image upload, CSV bulk import | Chapter 10 |
 | Frontend Step 5 | Orders list, status update, delete | Chapter 10 |
+
+---
+
+## Sprint 3 — what we completed
+
+| Step | What | Chapter |
+|------|------|---------|
+| Dashboard | Today's/month revenue stat cards | Chapter 15 |
+| Customer | `/track-order` page + storefront tracking link | Chapter 15 |
+| Returns | Model fields, public request, owner approve/reject | Chapter 15 |
+| WhatsApp | Placed, Preparing, Cancelled, Return approved alerts | Chapter 15 |
+
+---
+
+## Sprint 4 — in progress
+
+| Step | What | Chapter |
+|------|------|---------|
+| Delivery types | local / courier / pickup on Order model | Chapter 16 |
+| Owner UI | Delivery controls on Orders page | Chapter 16 |
+| Delivery person | `/deliver/:token` mobile page + photo | Chapter 16 |
+| OTP proof | WhatsApp OTP, verify on delivery | Chapter 16 |
+| Timeline | Status history on customer track page | Chapter 16 |
 
 ---
 

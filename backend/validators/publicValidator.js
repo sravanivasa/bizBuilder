@@ -1,4 +1,4 @@
-const { body } = require("express-validator");
+const { body, query } = require("express-validator");
 
 const CUSTOMER_NAME_MIN = 2;
 const CUSTOMER_NAME_MAX = 100;
@@ -17,8 +17,8 @@ const isValidIndianPhone = (value) => {
     return /^[6-9]\d{9}$/.test(cleaned);
 };
 
-const indianPhoneValidation = (fieldName, requiredMessage) =>
-    body(fieldName)
+const indianPhoneValidation = (fieldName, requiredMessage, location = "body") =>
+    (location === "query" ? query(fieldName) : body(fieldName))
         .trim()
         .notEmpty()
         .withMessage(requiredMessage)
@@ -67,6 +67,29 @@ const publicOrderValidation = [
         .withMessage("Invalid payment method")
 ];
 
+const trackOrderValidation = [
+    query("orderId")
+        .trim()
+        .notEmpty()
+        .withMessage("Order ID is required")
+        .isLength({ min: 6, max: 24 })
+        .withMessage("Order ID must be 6 characters or a full order ID"),
+
+    indianPhoneValidation("phone", "Phone number is required", "query")
+];
+
+const returnRequestValidation = [
+    indianPhoneValidation("phone", "Phone number is required"),
+
+    body("reason")
+        .optional()
+        .trim()
+        .isLength({ max: 500 })
+        .withMessage("Return reason must be at most 500 characters")
+];
+
 module.exports = {
-    publicOrderValidation
+    publicOrderValidation,
+    trackOrderValidation,
+    returnRequestValidation
 };

@@ -74,6 +74,22 @@
  *           type: string
  *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
  *           default: Pending
+ *         returnStatus:
+ *           type: string
+ *           enum: [None, Requested, Approved, Rejected, Completed]
+ *           default: None
+ *         returnReason:
+ *           type: string
+ *         returnRequestedAt:
+ *           type: string
+ *           format: date-time
+ *         returnResolvedAt:
+ *           type: string
+ *           format: date-time
+ *         trackingToken:
+ *           type: string
+ *           description: Secret token for customer order tracking (excluded from owner list APIs)
+ *           example: a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -114,4 +130,12 @@
  *           type: string
  *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
  *           example: Confirmed
+ *     OrderReturnStatusUpdateInput:
+ *       type: object
+ *       required: [returnStatus]
+ *       properties:
+ *         returnStatus:
+ *           type: string
+ *           enum: [Approved, Rejected]
+ *           example: Approved
  */

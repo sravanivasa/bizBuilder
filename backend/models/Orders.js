@@ -77,14 +77,105 @@ const orderSchema = new mongoose.Schema(
         orderStatus: {
             type: String,
             enum: [
+                "New",
+                "Processing",
+                "Shipped",
+                "OutForDelivery",
+                "Delivered",
+                "Cancelled",
                 "Pending",
                 "Confirmed",
                 "Preparing",
-                "Completed",
-                "Cancelled",
-                "Delivered"
+                "Completed"
             ],
             default: "Pending"
+        },
+
+        deliveryType: {
+            type: String,
+            enum: ["local", "courier", "pickup"],
+            default: null
+        },
+
+        courierName: {
+            type: String,
+            trim: true
+        },
+
+        trackingId: {
+            type: String,
+            trim: true
+        },
+
+        trackingUrl: {
+            type: String,
+            trim: true
+        },
+
+        deliveryPersonName: {
+            type: String,
+            trim: true
+        },
+
+        deliveryPersonPhone: {
+            type: String,
+            trim: true
+        },
+
+        deliveryToken: {
+            type: String,
+            unique: true,
+            sparse: true,
+            index: true
+        },
+
+        deliveryPhoto: {
+            type: String,
+            trim: true
+        },
+
+        deliveryOtp: {
+            type: String,
+            trim: true
+        },
+
+        deliveryOtpExpiresAt: {
+            type: Date
+        },
+
+        deliveryTimeline: [
+            {
+                status: { type: String, trim: true },
+                note: { type: String, trim: true, default: "" },
+                photo: { type: String, trim: true, default: null },
+                at: { type: Date, default: Date.now }
+            }
+        ],
+
+        returnStatus: {
+            type: String,
+            enum: ["None", "Requested", "Approved", "Rejected", "Completed"],
+            default: "None"
+        },
+
+        returnReason: {
+            type: String,
+            trim: true
+        },
+
+        returnRequestedAt: {
+            type: Date
+        },
+
+        returnResolvedAt: {
+            type: Date
+        },
+
+        trackingToken: {
+            type: String,
+            unique: true,
+            index: true,
+            required: true
         }
     },
     {

@@ -82,4 +82,23 @@
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/orders/{id}/return:
+ *   put:
+ *     summary: Approve or reject a customer return request
+ *     tags: [Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ $ref: '#/components/parameters/OrderId' }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/OrderReturnStatusUpdateInput' }
+ *     responses:
+ *       200:
+ *         description: Return status updated successfully
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */

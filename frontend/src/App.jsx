@@ -10,6 +10,9 @@ import BusinessSetup from "./pages/BusinessSetup";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import Storefront from "./pages/Storefront";
+import TrackOrder from "./pages/TrackOrder";
+import DeliverOrder from "./pages/DeliverOrder";
+import MyOrders from "./pages/MyOrders";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 
@@ -17,7 +20,14 @@ const App = () => {
     return (
         <BrowserRouter>
             <Routes>
-                <Route path="/store/:businessId" element={<Storefront />} />
+                <Route path="/store/:storeSlug" element={<Storefront />} />
+                <Route path="/store/:storeSlug/track/:token" element={<TrackOrder />} />
+                <Route path="/store/:storeSlug/track" element={<TrackOrder />} />
+                <Route path="/store/:storeSlug/my-orders" element={<MyOrders />} />
+                <Route path="/track/:token" element={<TrackOrder />} />
+                <Route path="/deliver/:deliveryToken" element={<DeliverOrder />} />
+                <Route path="/my-orders" element={<MyOrders />} />
+                <Route path="/track-order" element={<TrackOrder />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
 
