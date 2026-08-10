@@ -1,0 +1,3 @@
+# Used when builder is NIXPACKS (dashboard override). Express API has no compile step.
+[phases.build]
+cmds = []
