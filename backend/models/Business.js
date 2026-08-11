@@ -59,7 +59,6 @@ const businessSchema = new mongoose.Schema(
 );
 
 businessSchema.index({ owner: 1 });
-businessSchema.index({ slug: 1 }, { unique: true, sparse: true });
 
 businessSchema.pre("save", async function ensureSlug(next) {
     if (!this.slug && this.businessName) {
