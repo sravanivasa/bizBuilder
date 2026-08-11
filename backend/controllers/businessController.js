@@ -5,6 +5,7 @@ const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
 const pickFields = require("../utils/pickFields");
 const { generateSlug, ensureUniqueSlug } = require("../utils/generateSlug");
+const { ensureBusinessSlug } = require("../utils/resolveBusiness");
 
 const BUSINESS_FIELDS = [
     "businessName",
@@ -46,11 +47,14 @@ const createBusiness = asyncHandler(async (req, res) => {
 
 const getMyBusinesses = asyncHandler(async (req, res) => {
     const businesses = await Business.find({ owner: req.user._id });
+    const businessesWithSlugs = await Promise.all(
+        businesses.map((business) => ensureBusinessSlug(business))
+    );
 
     res.status(200).json({
         success: true,
         message: "Businesses fetched successfully",
-        businesses
+        businesses: businessesWithSlugs
     });
 });
 

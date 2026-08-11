@@ -60,12 +60,11 @@ const businessSchema = new mongoose.Schema(
 
 businessSchema.index({ owner: 1 });
 
-businessSchema.pre("save", async function ensureSlug(next) {
+businessSchema.pre("save", async function ensureSlug() {
     if (!this.slug && this.businessName) {
         const baseSlug = generateSlug(this.businessName);
         this.slug = await ensureUniqueSlug(this.constructor, baseSlug, this._id);
     }
-    next();
 });
 
 module.exports = mongoose.model("Business", businessSchema);

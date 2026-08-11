@@ -35,4 +35,4 @@ const resolveBusiness = async (idOrSlug) => {
     return ensureBusinessSlug(business);
 };
 
-module.exports = { resolveBusiness, isObjectId };
+module.exports = { resolveBusiness, ensureBusinessSlug, isObjectId };
