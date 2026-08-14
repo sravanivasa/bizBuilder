@@ -57,6 +57,20 @@ const orderSchema = new mongoose.Schema(
             }
         ],
 
+        subtotal: {
+            type: Number
+        },
+
+        gstAmount: {
+            type: Number,
+            default: 0
+        },
+
+        gstRate: {
+            type: Number,
+            default: 0
+        },
+
         totalAmount: {
             type: Number,
             required: true
@@ -64,14 +78,18 @@ const orderSchema = new mongoose.Schema(
 
         paymentMethod: {
             type: String,
-            enum: ["Cash", "Card", "UPI"],
+            enum: ["Cash", "COD", "GPay", "PhonePe", "NetBanking", "UPI", "Card"],
             default: "Cash"
         },
 
         paymentStatus: {
             type: String,
-            enum: ["Pending", "Paid"],
+            enum: ["Pending", "AwaitingPayment", "PaymentSubmitted", "Paid", "Failed", "COD"],
             default: "Pending"
+        },
+
+        paymentSubmittedAt: {
+            type: Date
         },
 
         orderStatus: {
@@ -154,11 +172,32 @@ const orderSchema = new mongoose.Schema(
 
         returnStatus: {
             type: String,
-            enum: ["None", "Requested", "Approved", "Rejected", "Completed"],
+            enum: [
+                "None",
+                "Requested",
+                "Accepted",
+                "Shipped",
+                "Delivered",
+                "Rejected",
+                "Approved",
+                "Completed"
+            ],
             default: "None"
         },
 
         returnReason: {
+            type: String,
+            trim: true
+        },
+
+        returnPhotos: [
+            {
+                type: String,
+                trim: true
+            }
+        ],
+
+        returnVideo: {
             type: String,
             trim: true
         },
@@ -171,11 +210,45 @@ const orderSchema = new mongoose.Schema(
             type: Date
         },
 
+        returnTrackingId: {
+            type: String,
+            trim: true
+        },
+
+        returnCourier: {
+            type: String,
+            trim: true
+        },
+
+        returnShippedAt: {
+            type: Date
+        },
+
+        returnDeliveredAt: {
+            type: Date
+        },
+
         trackingToken: {
             type: String,
             unique: true,
             index: true,
             required: true
+        },
+
+        razorpayOrderId: {
+            type: String,
+            trim: true,
+            index: true,
+            sparse: true
+        },
+
+        razorpayPaymentId: {
+            type: String,
+            trim: true
+        },
+
+        paidAt: {
+            type: Date
         }
     },
     {

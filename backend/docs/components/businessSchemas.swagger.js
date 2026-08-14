@@ -40,6 +40,15 @@
  *         logo:
  *           type: string
  *           example: https://example.com/logo.png
+ *         gstin:
+ *           type: string
+ *           example: 36ABCDE1234F1Z5
+ *         gstEnabled:
+ *           type: boolean
+ *           example: true
+ *         gstRate:
+ *           type: number
+ *           example: 18
  *         owner:
  *           type: string
  *           description: User ID of the business owner
@@ -80,6 +89,15 @@
  *         logo:
  *           type: string
  *           example: https://example.com/logo.png
+ *         gstin:
+ *           type: string
+ *           example: 36ABCDE1234F1Z5
+ *         gstEnabled:
+ *           type: boolean
+ *           example: true
+ *         gstRate:
+ *           type: number
+ *           example: 18
  *     BusinessUpdateInput:
  *       type: object
  *       properties:
@@ -110,4 +128,22 @@
  *         logo:
  *           type: string
  *           example: https://example.com/logo.png
+ *         gstin:
+ *           type: string
+ *           example: 36ABCDE1234F1Z5
+ *         gstEnabled:
+ *           type: boolean
+ *           example: true
+ *         gstRate:
+ *           type: number
+ *           example: 18
+ *         razorpayEnabled:
+ *           type: boolean
+ *           example: true
+ *         razorpayKeyId:
+ *           type: string
+ *           example: rzp_test_xxxxxxxx
+ *         hasRazorpaySecret:
+ *           type: boolean
+ *           description: True when a key secret is saved (secret is never returned in API responses)
  */

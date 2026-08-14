@@ -1,4 +1,5 @@
 const { body, query } = require("express-validator");
+const { PAYMENT_METHODS } = require("../utils/paymentMethods");
 
 const CUSTOMER_NAME_MIN = 2;
 const CUSTOMER_NAME_MAX = 100;
@@ -63,7 +64,7 @@ const publicOrderValidation = [
     body("paymentMethod")
         .notEmpty()
         .withMessage("Payment method is required")
-        .isIn(["Cash", "Card", "UPI"])
+        .isIn(PAYMENT_METHODS)
         .withMessage("Invalid payment method")
 ];
 
@@ -88,8 +89,24 @@ const returnRequestValidation = [
         .withMessage("Return reason must be at most 500 characters")
 ];
 
+const verifyRazorpayPaymentValidation = [
+    body("razorpay_order_id")
+        .trim()
+        .notEmpty()
+        .withMessage("razorpay_order_id is required"),
+    body("razorpay_payment_id")
+        .trim()
+        .notEmpty()
+        .withMessage("razorpay_payment_id is required"),
+    body("razorpay_signature")
+        .trim()
+        .notEmpty()
+        .withMessage("razorpay_signature is required")
+];
+
 module.exports = {
     publicOrderValidation,
     trackOrderValidation,
-    returnRequestValidation
+    returnRequestValidation,
+    verifyRazorpayPaymentValidation
 };

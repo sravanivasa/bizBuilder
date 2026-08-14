@@ -51,6 +51,65 @@ const businessSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true
+        },
+        gstin: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        gstEnabled: {
+            type: Boolean,
+            default: false
+        },
+        gstRate: {
+            type: Number,
+            default: 18,
+            min: 0,
+            max: 100
+        },
+        upiId: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        bankAccountName: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        bankName: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        bankAccountNumber: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        bankIfsc: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        autoConfirmOnlinePayments: {
+            type: Boolean,
+            default: false
+        },
+        razorpayEnabled: {
+            type: Boolean,
+            default: false
+        },
+        razorpayKeyId: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        razorpayKeySecret: {
+            type: String,
+            trim: true,
+            default: "",
+            select: false
         }
     },
     {

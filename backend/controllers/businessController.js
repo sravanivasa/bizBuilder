@@ -7,6 +7,8 @@ const pickFields = require("../utils/pickFields");
 const { generateSlug, ensureUniqueSlug } = require("../utils/generateSlug");
 const { ensureBusinessSlug } = require("../utils/resolveBusiness");
 
+const RAZORPAY_SECRET_MASK = "••••••••";
+
 const BUSINESS_FIELDS = [
     "businessName",
     "category",
@@ -15,8 +17,31 @@ const BUSINESS_FIELDS = [
     "address",
     "email",
     "website",
-    "logo"
+    "logo",
+    "gstin",
+    "gstEnabled",
+    "gstRate",
+    "upiId",
+    "bankAccountName",
+    "bankName",
+    "bankAccountNumber",
+    "bankIfsc",
+    "autoConfirmOnlinePayments",
+    "razorpayEnabled",
+    "razorpayKeyId"
 ];
+
+const formatBusinessForOwner = (business) => {
+    const plain = business.toObject ? business.toObject() : { ...business };
+    plain.hasRazorpaySecret = Boolean(plain.razorpayKeySecret);
+    delete plain.razorpayKeySecret;
+
+    if (plain.hasRazorpaySecret) {
+        plain.razorpayKeySecret = RAZORPAY_SECRET_MASK;
+    }
+
+    return plain;
+};
 
 const createBusiness = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
@@ -32,6 +57,10 @@ const createBusiness = asyncHandler(async (req, res) => {
     const baseSlug = generateSlug(businessFields.businessName);
     const slug = await ensureUniqueSlug(Business, baseSlug);
 
+    if (req.body.razorpayKeySecret?.trim()) {
+        businessFields.razorpayKeySecret = req.body.razorpayKeySecret.trim();
+    }
+
     const business = await Business.create({
         ...businessFields,
         slug,
@@ -41,14 +70,17 @@ const createBusiness = asyncHandler(async (req, res) => {
     res.status(201).json({
         success: true,
         message: "Business created successfully",
-        business
+        business: formatBusinessForOwner(business)
     });
 });
 
 const getMyBusinesses = asyncHandler(async (req, res) => {
-    const businesses = await Business.find({ owner: req.user._id });
+    const businesses = await Business.find({ owner: req.user._id }).select("+razorpayKeySecret");
     const businessesWithSlugs = await Promise.all(
-        businesses.map((business) => ensureBusinessSlug(business))
+        businesses.map(async (business) => {
+            const withSlug = await ensureBusinessSlug(business);
+            return formatBusinessForOwner(withSlug);
+        })
     );
 
     res.status(200).json({
@@ -59,7 +91,7 @@ const getMyBusinesses = asyncHandler(async (req, res) => {
 });
 
 const getBusinessById = asyncHandler(async (req, res) => {
-    const business = await Business.findById(req.params.id);
+    const business = await Business.findById(req.params.id).select("+razorpayKeySecret");
 
     if (!business) {
         return res.status(404).json({
@@ -71,7 +103,7 @@ const getBusinessById = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         message: "Business fetched successfully",
-        business
+        business: formatBusinessForOwner(business)
     });
 });
 
@@ -103,6 +135,16 @@ const updateBusiness = asyncHandler(async (req, res) => {
 
     const updates = pickFields(req.body, BUSINESS_FIELDS);
 
+    const incomingSecret = req.body.razorpayKeySecret;
+
+    if (
+        incomingSecret &&
+        incomingSecret.trim() &&
+        incomingSecret !== RAZORPAY_SECRET_MASK
+    ) {
+        updates.razorpayKeySecret = incomingSecret.trim();
+    }
+
     if (!business.slug) {
         const nameForSlug = updates.businessName || business.businessName;
         const baseSlug = generateSlug(nameForSlug);
@@ -112,12 +154,12 @@ const updateBusiness = asyncHandler(async (req, res) => {
     const updatedBusiness = await Business.findByIdAndUpdate(req.params.id, updates, {
         new: true,
         runValidators: true
-    });
+    }).select("+razorpayKeySecret");
 
     res.status(200).json({
         success: true,
         message: "Business updated successfully",
-        business: updatedBusiness
+        business: formatBusinessForOwner(updatedBusiness)
     });
 });
 

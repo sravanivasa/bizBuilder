@@ -12,7 +12,19 @@ const EMPTY_FORM = {
     description: "",
     email: "",
     website: "",
-    logo: ""
+    logo: "",
+    gstin: "",
+    gstEnabled: false,
+    gstRate: "18",
+    upiId: "",
+    bankAccountName: "",
+    bankName: "",
+    bankAccountNumber: "",
+    bankIfsc: "",
+    autoConfirmOnlinePayments: false,
+    razorpayEnabled: false,
+    razorpayKeyId: "",
+    razorpayKeySecret: ""
 };
 
 const inputClassName =
@@ -50,7 +62,21 @@ const BusinessSetup = () => {
                         description: business.description || "",
                         email: business.email || "",
                         website: business.website || "",
-                        logo: business.logo || ""
+                        logo: business.logo || "",
+                        gstin: business.gstin || "",
+                        gstEnabled: Boolean(business.gstEnabled),
+                        gstRate: String(business.gstRate ?? 18),
+                        upiId: business.upiId || "",
+                        bankAccountName: business.bankAccountName || "",
+                        bankName: business.bankName || "",
+                        bankAccountNumber: business.bankAccountNumber || "",
+                        bankIfsc: business.bankIfsc || "",
+                        autoConfirmOnlinePayments: Boolean(business.autoConfirmOnlinePayments),
+                        razorpayEnabled: Boolean(business.razorpayEnabled),
+                        razorpayKeyId: business.razorpayKeyId || "",
+                        razorpayKeySecret: business.hasRazorpaySecret
+                            ? business.razorpayKeySecret || "••••••••"
+                            : ""
                     });
                     setIsEditing(false);
                 } else {
@@ -67,7 +93,11 @@ const BusinessSetup = () => {
     }, [t]);
 
     const handleChange = (event) => {
-        setForm({ ...form, [event.target.name]: event.target.value });
+        const { name, value, type, checked } = event.target;
+        setForm({
+            ...form,
+            [name]: type === "checkbox" ? checked : value
+        });
     };
 
     const handleSubmit = async (event) => {
@@ -84,8 +114,23 @@ const BusinessSetup = () => {
             description: form.description.trim() || undefined,
             email: form.email.trim() || undefined,
             website: form.website.trim() || undefined,
-            logo: form.logo.trim() || undefined
+            logo: form.logo.trim() || undefined,
+            gstin: form.gstin.trim() || undefined,
+            gstEnabled: form.gstEnabled,
+            gstRate: Number(form.gstRate) || 18,
+            upiId: form.upiId.trim() || undefined,
+            bankAccountName: form.bankAccountName.trim() || undefined,
+            bankName: form.bankName.trim() || undefined,
+            bankAccountNumber: form.bankAccountNumber.trim() || undefined,
+            bankIfsc: form.bankIfsc.trim() || undefined,
+            autoConfirmOnlinePayments: form.autoConfirmOnlinePayments,
+            razorpayEnabled: form.razorpayEnabled,
+            razorpayKeyId: form.razorpayKeyId.trim() || undefined
         };
+
+        if (form.razorpayKeySecret.trim() && form.razorpayKeySecret !== "••••••••") {
+            payload.razorpayKeySecret = form.razorpayKeySecret.trim();
+        }
 
         try {
             if (businessId) {
@@ -98,7 +143,21 @@ const BusinessSetup = () => {
                     description: data.business.description || "",
                     email: data.business.email || "",
                     website: data.business.website || "",
-                    logo: data.business.logo || ""
+                    logo: data.business.logo || "",
+                    gstin: data.business.gstin || "",
+                    gstEnabled: Boolean(data.business.gstEnabled),
+                    gstRate: String(data.business.gstRate ?? 18),
+                    upiId: data.business.upiId || "",
+                    bankAccountName: data.business.bankAccountName || "",
+                    bankName: data.business.bankName || "",
+                    bankAccountNumber: data.business.bankAccountNumber || "",
+                    bankIfsc: data.business.bankIfsc || "",
+                    autoConfirmOnlinePayments: Boolean(data.business.autoConfirmOnlinePayments),
+                    razorpayEnabled: Boolean(data.business.razorpayEnabled),
+                    razorpayKeyId: data.business.razorpayKeyId || "",
+                    razorpayKeySecret: data.business.hasRazorpaySecret
+                        ? data.business.razorpayKeySecret || "••••••••"
+                        : ""
                 });
                 setSuccess(t("businessUpdateSuccess"));
             } else {
@@ -273,6 +332,148 @@ const BusinessSetup = () => {
                                 type: "textarea",
                                 fullWidth: true
                             })}
+
+                            <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h3 className="text-sm font-semibold text-emerald-50">{t("gstSettingsTitle")}</h3>
+                                <p className="mt-1 text-xs text-emerald-100/60">{t("gstSettingsHint")}</p>
+
+                                <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                                    <div className="sm:col-span-2">
+                                        {isEditing ? (
+                                            <label className="flex items-center gap-3 text-sm text-emerald-50">
+                                                <input
+                                                    type="checkbox"
+                                                    name="gstEnabled"
+                                                    checked={form.gstEnabled}
+                                                    onChange={handleChange}
+                                                    className="h-4 w-4 rounded border-white/30 bg-white/10 text-emerald-500"
+                                                />
+                                                {t("gstEnabled")}
+                                            </label>
+                                        ) : (
+                                            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white">
+                                                {form.gstEnabled ? t("gstEnabled") : "—"}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {renderField("gstin", t("gstin"), form.gstin, {
+                                        hint: t("gstinHint")
+                                    })}
+
+                                    <div>
+                                        <label htmlFor="gstRate" className={labelClassName}>
+                                            {t("gstRate")}
+                                        </label>
+                                        {isEditing ? (
+                                            <select
+                                                id="gstRate"
+                                                name="gstRate"
+                                                value={form.gstRate}
+                                                onChange={handleChange}
+                                                disabled={!form.gstEnabled}
+                                                className={`${inputClassName} appearance-none disabled:opacity-50`}
+                                            >
+                                                <option value="5" className="bg-slate-900 text-white">
+                                                    5%
+                                                </option>
+                                                <option value="12" className="bg-slate-900 text-white">
+                                                    12%
+                                                </option>
+                                                <option value="18" className="bg-slate-900 text-white">
+                                                    18%
+                                                </option>
+                                            </select>
+                                        ) : (
+                                            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white">
+                                                {form.gstEnabled ? `${form.gstRate}%` : "—"}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h3 className="text-sm font-semibold text-emerald-50">{t("paymentSettingsTitle")}</h3>
+                                <p className="mt-1 text-xs text-emerald-100/60">{t("paymentSettingsHint")}</p>
+
+                                <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                                    {renderField("upiId", t("upiId"), form.upiId, {
+                                        hint: t("upiIdHint")
+                                    })}
+
+                                    {renderField("bankAccountName", t("bankAccountName"), form.bankAccountName)}
+
+                                    {renderField("bankName", t("bankName"), form.bankName)}
+
+                                    {renderField("bankAccountNumber", t("bankAccountNumber"), form.bankAccountNumber)}
+
+                                    {renderField("bankIfsc", t("bankIfsc"), form.bankIfsc, {
+                                        hint: t("bankIfscHint")
+                                    })}
+                                </div>
+
+                                <div className="mt-5 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
+                                    <label className="flex cursor-pointer items-start gap-3">
+                                        <input
+                                            type="checkbox"
+                                            name="autoConfirmOnlinePayments"
+                                            checked={form.autoConfirmOnlinePayments}
+                                            onChange={handleChange}
+                                            disabled={!isEditing}
+                                            className="mt-1 h-4 w-4 rounded border-white/30 bg-white/10 text-emerald-500 focus:ring-emerald-400/40 disabled:opacity-50"
+                                        />
+                                        <span>
+                                            <span className="block text-sm font-medium text-emerald-50">
+                                                {t("autoConfirmOnlinePayments")}
+                                            </span>
+                                            <span className="mt-1 block text-xs text-amber-100/80">
+                                                {t("autoConfirmOnlinePaymentsHint")}
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h3 className="text-sm font-semibold text-emerald-50">{t("razorpaySettings")}</h3>
+                                <p className="mt-1 text-xs text-emerald-100/60">{t("razorpaySettingsHint")}</p>
+
+                                <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                                    <div className="sm:col-span-2">
+                                        {isEditing ? (
+                                            <label className="flex items-center gap-3 text-sm text-emerald-50">
+                                                <input
+                                                    type="checkbox"
+                                                    name="razorpayEnabled"
+                                                    checked={form.razorpayEnabled}
+                                                    onChange={handleChange}
+                                                    className="h-4 w-4 rounded border-white/30 bg-white/10 text-emerald-500"
+                                                />
+                                                {t("razorpayEnabled")}
+                                            </label>
+                                        ) : (
+                                            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white">
+                                                {form.razorpayEnabled ? t("razorpayEnabled") : "—"}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {renderField("razorpayKeyId", t("razorpayKeyId"), form.razorpayKeyId, {
+                                        hint: t("razorpayKeyIdHint")
+                                    })}
+
+                                    {renderField(
+                                        "razorpayKeySecret",
+                                        t("razorpayKeySecret"),
+                                        form.razorpayKeySecret,
+                                        {
+                                            type: "password",
+                                            hint: t("razorpayKeySecretHint")
+                                        }
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         {isEditing && (

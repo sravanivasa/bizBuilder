@@ -83,9 +83,14 @@ In Railway → your backend service → **Variables**, add:
 | `CLOUDINARY_API_SECRET` | Yes | From Cloudinary dashboard |
 | `WHATSAPP_API_TOKEN` | Optional* | Meta permanent access token |
 | `WHATSAPP_PHONE_NUMBER_ID` | Optional* | Meta phone number ID |
+| `RAZORPAY_KEY_ID` | Optional** | Platform fallback Key ID (`rzp_test_...` or `rzp_live_...`) |
+| `RAZORPAY_KEY_SECRET` | Optional** | Platform fallback Key Secret (never expose to frontend) |
+| `RAZORPAY_WEBHOOK_SECRET` | Optional | Webhook signing secret from Razorpay Dashboard → Webhooks |
 | `PORT` | No | Railway sets this automatically |
 
 \* WhatsApp vars are optional for deploy — orders work without them (messages are logged and skipped). Add them when Meta credentials are ready.
+
+\** Razorpay platform keys are used when a business has not configured their own keys in Business Setup. Per-business keys (preferred for multi-tenant) are stored in MongoDB via the owner dashboard.
 
 **Generate a secure JWT_SECRET:**
 
@@ -94,6 +99,29 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 Railway redeploys automatically when variables change.
+
+### Razorpay (online payments)
+
+1. Create a [Razorpay](https://razorpay.com) account and switch to **Test Mode** for development.
+2. Copy **Key ID** and **Key Secret** from [Dashboard → API Keys](https://dashboard.razorpay.com/app/keys).
+3. Either:
+   - Set platform fallback keys in Railway (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`), **or**
+   - Let each shop owner add their own keys in **Business Setup → Razorpay settings**.
+4. In Business Setup, enable **Enable Razorpay payments** and save.
+5. (Recommended) Add webhook `POST https://YOUR-RAILWAY-URL/api/webhooks/razorpay` with event `payment.captured`, and set `RAZORPAY_WEBHOOK_SECRET` in Railway.
+
+**Payment confirmation (dual path):**
+
+| Path | When | Endpoint |
+|------|------|----------|
+| Browser callback (primary UX) | Customer completes Razorpay Checkout | `POST /api/public/orders/pay/:token/verify` |
+| Webhook (reliability) | Browser closes/crashes before callback | `POST /api/webhooks/razorpay` |
+
+Both paths verify signatures server-side, validate amount against the MongoDB order, and call the shared `markOrderPaymentPaid` helper (idempotent — duplicate events are logged and ignored).
+
+**Order timing:** BizBuilder order is created at checkout with `AwaitingPayment`. The Razorpay order is created only when the customer clicks **Pay** (backend recalculates amount from the stored order).
+
+**Test card:** `4111 1111 1111 1111`, any future expiry, any CVV.
 
 ---
 

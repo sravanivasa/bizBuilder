@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { trackPublicOrder, trackPublicOrderByToken } from "../api/public";
+import { requestPublicReturn, trackPublicOrder, trackPublicOrderByToken } from "../api/public";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { formatIndianPhone } from "../utils/checkoutValidation";
 import {
     getCustomerOrders,
     getStorePath,
     getTrackPath,
     updateCustomerOrderStatus
 } from "../utils/customerOrdersStorage";
+import { canRequestReturn, normalizeReturnStatus, returnBadgeClass, statusBadgeClass } from "../utils/orderStatus";
+import { canViewInvoice } from "../utils/paymentStatus";
+
+const inputClassName =
+    "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-emerald-100/60 outline-none transition focus:border-emerald-300 focus:bg-white/15 focus:ring-2 focus:ring-emerald-400/30";
+
+const labelClassName = "mb-2 block text-sm font-medium text-emerald-50";
 
 const formatPrice = (value) => `₹${Number(value).toLocaleString("en-IN")}`;
 
@@ -24,31 +32,20 @@ const formatDate = (value) => {
     });
 };
 
-const statusBadgeClass = (status) => {
-    switch (status) {
-        case "Pending":
-            return "bg-amber-500/20 text-amber-100 border-amber-400/30";
-        case "Confirmed":
-            return "bg-blue-500/20 text-blue-100 border-blue-400/30";
-        case "Preparing":
-            return "bg-violet-500/20 text-violet-100 border-violet-400/30";
-        case "Completed":
-            return "bg-emerald-500/20 text-emerald-100 border-emerald-400/30";
-        case "Cancelled":
-            return "bg-red-500/20 text-red-100 border-red-400/30";
-        case "Delivered":
-            return "bg-teal-500/20 text-teal-100 border-teal-400/30";
-        default:
-            return "bg-white/10 text-emerald-50 border-white/20";
-    }
-};
-
 const MyOrders = () => {
     const { storeSlug } = useParams();
     const { t } = useTranslation();
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [returnTarget, setReturnTarget] = useState(null);
+    const [returnReason, setReturnReason] = useState("");
+    const [returnPhotoFiles, setReturnPhotoFiles] = useState([]);
+    const [returnVideoFile, setReturnVideoFile] = useState(null);
+    const [photoPreviewUrls, setPhotoPreviewUrls] = useState([]);
+    const [videoPreviewUrl, setVideoPreviewUrl] = useState("");
+    const [returnLoading, setReturnLoading] = useState(false);
+    const [returnError, setReturnError] = useState("");
 
     const loadOrders = useCallback(async () => {
         const stored = getCustomerOrders(storeSlug);
@@ -72,17 +69,25 @@ const MyOrders = () => {
                             phone: item.phone
                         }));
                     }
-                    const status = data.order?.orderStatus;
+                    const order = data.order;
+                    const status = order?.orderStatus;
                     if (status) {
                         updateCustomerOrderStatus(item.orderId, status);
                     }
                     return {
                         ...item,
                         orderStatus: status || item.orderStatus,
+                        paymentStatus: order?.paymentStatus || item.paymentStatus,
+                        paymentMethod: order?.paymentMethod || item.paymentMethod,
+                        returnStatus: order?.returnStatus || item.returnStatus || "None",
+                        returnReason: order?.returnReason || item.returnReason,
+                        returnPhotos: order?.returnPhotos || item.returnPhotos || [],
+                        returnVideo: order?.returnVideo || item.returnVideo || null,
                         businessName:
-                            data.order?.business?.businessName || item.businessName,
+                            order?.business?.businessName || item.businessName,
                         businessSlug:
-                            data.order?.business?.slug || item.businessSlug
+                            order?.business?.slug || item.businessSlug,
+                        businessId: order?.businessId || item.businessId
                     };
                 } catch {
                     return item;
@@ -99,10 +104,106 @@ const MyOrders = () => {
     }, [loadOrders]);
 
     const getStatusLabel = (status) => t(`orderStatus${status}`);
+    const getReturnStatusLabel = (status) =>
+        t(`returnStatus${normalizeReturnStatus(status)}`);
 
     const trackPath = (item) => getTrackPath(item);
 
     const shopPath = storeSlug ? `/store/${storeSlug}` : null;
+
+    const resetReturnEvidence = () => {
+        photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+        if (videoPreviewUrl) {
+            URL.revokeObjectURL(videoPreviewUrl);
+        }
+        setReturnPhotoFiles([]);
+        setReturnVideoFile(null);
+        setPhotoPreviewUrls([]);
+        setVideoPreviewUrl("");
+    };
+
+    const handleReturnPhotoSelect = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) {
+            return;
+        }
+
+        photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+        const combined = [...returnPhotoFiles, ...files].slice(0, 5);
+        setReturnPhotoFiles(combined);
+        setPhotoPreviewUrls(combined.map((file) => URL.createObjectURL(file)));
+        event.target.value = "";
+    };
+
+    const handleReturnVideoSelect = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        if (videoPreviewUrl) {
+            URL.revokeObjectURL(videoPreviewUrl);
+        }
+        setReturnVideoFile(file);
+        setVideoPreviewUrl(URL.createObjectURL(file));
+        event.target.value = "";
+    };
+
+    const handleReturnRequest = async (event) => {
+        event.preventDefault();
+        if (!returnTarget) {
+            return;
+        }
+
+        setReturnError("");
+        setReturnLoading(true);
+
+        const businessId =
+            returnTarget.businessSlug || returnTarget.businessId || storeSlug;
+
+        try {
+            const formData = new FormData();
+            formData.append("phone", formatIndianPhone(returnTarget.phone));
+            formData.append("reason", returnReason.trim());
+            returnPhotoFiles.forEach((file) => formData.append("photos", file));
+            if (returnVideoFile) {
+                formData.append("video", returnVideoFile);
+            }
+
+            const { data } = await requestPublicReturn(
+                businessId,
+                returnTarget.shortOrderId,
+                formData
+            );
+            setOrders((current) =>
+                current.map((item) =>
+                    item.orderId === returnTarget.orderId
+                        ? {
+                              ...item,
+                              returnStatus: "Requested",
+                              returnReason: returnReason.trim(),
+                              returnPhotos: data.order?.returnPhotos || [],
+                              returnVideo: data.order?.returnVideo || null
+                          }
+                        : item
+                )
+            );
+            setReturnTarget(null);
+            setReturnReason("");
+            resetReturnEvidence();
+        } catch (err) {
+            setReturnError(err.response?.data?.message || t("returnRequestFailed"));
+        } finally {
+            setReturnLoading(false);
+        }
+    };
+
+    const openReturnModal = (item) => {
+        setReturnTarget(item);
+        setReturnReason("");
+        setReturnError("");
+        resetReturnEvidence();
+    };
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-slate-950">
@@ -164,23 +265,38 @@ const MyOrders = () => {
                         </div>
                     ) : (
                         <ul className="mt-6 space-y-3">
-                            {orders.map((item) => (
-                                <li key={item.orderId}>
-                                    <Link
-                                        to={trackPath(item)}
-                                        className="block rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:border-emerald-400/30 hover:bg-white/10"
+                            {orders.map((item) => {
+                                const normalizedReturn = normalizeReturnStatus(item.returnStatus);
+                                const showReturnBadge =
+                                    normalizedReturn && normalizedReturn !== "None";
+
+                                return (
+                                    <li
+                                        key={item.orderId}
+                                        className="rounded-2xl border border-white/10 bg-white/5 p-4"
                                     >
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <span className="font-semibold text-white">
                                                 #{item.shortOrderId}
                                             </span>
-                                            <span
-                                                className={`rounded-full border px-3 py-1 text-xs font-medium ${statusBadgeClass(
-                                                    item.orderStatus
-                                                )}`}
-                                            >
-                                                {getStatusLabel(item.orderStatus)}
-                                            </span>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span
+                                                    className={`rounded-full border px-3 py-1 text-xs font-medium ${statusBadgeClass(
+                                                        item.orderStatus
+                                                    )}`}
+                                                >
+                                                    {getStatusLabel(item.orderStatus)}
+                                                </span>
+                                                {showReturnBadge && (
+                                                    <span
+                                                        className={`rounded-full border px-3 py-1 text-xs font-medium ${returnBadgeClass(
+                                                            item.returnStatus
+                                                        )}`}
+                                                    >
+                                                        {getReturnStatusLabel(item.returnStatus)}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         {item.businessName && (
                                             <p className="mt-2 text-sm text-emerald-50/70">
@@ -193,12 +309,42 @@ const MyOrders = () => {
                                                 {formatPrice(item.totalAmount)}
                                             </span>
                                         </div>
-                                        <p className="mt-2 text-xs font-medium text-emerald-300">
-                                            {t("myOrdersViewStatus")} →
-                                        </p>
-                                    </Link>
-                                </li>
-                            ))}
+                                        {item.returnReason && (
+                                            <p className="mt-2 text-xs text-emerald-50/70">
+                                                <span className="text-emerald-100/60">
+                                                    {t("returnReason")}:{" "}
+                                                </span>
+                                                {item.returnReason}
+                                            </p>
+                                        )}
+                                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                                            <Link
+                                                to={trackPath(item)}
+                                                className="text-xs font-medium text-emerald-300 transition hover:text-emerald-200"
+                                            >
+                                                {t("myOrdersViewStatus")} →
+                                            </Link>
+                                            {item.trackingToken && canViewInvoice(item.paymentStatus) && (
+                                                <Link
+                                                    to={`/invoice/${item.trackingToken}`}
+                                                    className="text-xs font-medium text-emerald-300 transition hover:text-emerald-200"
+                                                >
+                                                    {t("viewInvoice")} →
+                                                </Link>
+                                            )}
+                                            {canRequestReturn(item) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openReturnModal(item)}
+                                                    className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/20"
+                                                >
+                                                    {t("requestReturn")}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
 
@@ -229,6 +375,109 @@ const MyOrders = () => {
                     </div>
                 </div>
             </div>
+
+            {returnTarget && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+                    <button
+                        type="button"
+                        aria-label={t("close")}
+                        onClick={() => {
+                            setReturnTarget(null);
+                            resetReturnEvidence();
+                        }}
+                        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+                    />
+                    <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/15 bg-slate-900/95 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
+                        <h2 className="text-lg font-bold text-white">{t("requestReturnTitle")}</h2>
+                        <p className="mt-2 text-sm text-emerald-50/70">{t("requestReturnSubtitle")}</p>
+                        <form onSubmit={handleReturnRequest} className="mt-4 space-y-4">
+                            {returnError && (
+                                <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                                    {returnError}
+                                </p>
+                            )}
+                            <div>
+                                <label className={labelClassName} htmlFor="myOrdersReturnReason">
+                                    {t("returnReason")}
+                                </label>
+                                <textarea
+                                    id="myOrdersReturnReason"
+                                    rows={3}
+                                    value={returnReason}
+                                    onChange={(event) => setReturnReason(event.target.value)}
+                                    placeholder={t("returnReasonPlaceholder")}
+                                    className={inputClassName}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClassName} htmlFor="myOrdersReturnPhotos">
+                                    {t("returnEvidencePhotos")}
+                                </label>
+                                <p className="mb-2 text-xs text-emerald-50/60">{t("returnEvidenceOptional")}</p>
+                                <input
+                                    id="myOrdersReturnPhotos"
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    multiple
+                                    onChange={handleReturnPhotoSelect}
+                                    className="block w-full text-sm text-emerald-50/80 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                                />
+                                {photoPreviewUrls.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {photoPreviewUrls.map((url, index) => (
+                                            <img
+                                                key={url}
+                                                src={url}
+                                                alt={t("returnEvidencePhotoAlt", { index: index + 1 })}
+                                                className="h-20 w-20 rounded-lg object-cover"
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label className={labelClassName} htmlFor="myOrdersReturnVideo">
+                                    {t("returnEvidenceVideo")}
+                                </label>
+                                <p className="mb-2 text-xs text-emerald-50/60">{t("returnEvidenceVideoHint")}</p>
+                                <input
+                                    id="myOrdersReturnVideo"
+                                    type="file"
+                                    accept="video/mp4,video/quicktime"
+                                    onChange={handleReturnVideoSelect}
+                                    className="block w-full text-sm text-emerald-50/80 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                                />
+                                {videoPreviewUrl && (
+                                    <video
+                                        src={videoPreviewUrl}
+                                        controls
+                                        className="mt-3 max-h-40 w-full rounded-lg"
+                                    />
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={returnLoading}
+                                    className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60"
+                                >
+                                    {returnLoading ? t("loading") : t("submitReturnRequest")}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setReturnTarget(null);
+                                        resetReturnEvidence();
+                                    }}
+                                    className="rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+                                >
+                                    {t("cancel")}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

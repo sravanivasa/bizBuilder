@@ -17,6 +17,12 @@
  *         address:
  *           type: string
  *           example: 12 MG Road, Hyderabad
+ *         gstEnabled:
+ *           type: boolean
+ *           example: true
+ *         gstRate:
+ *           type: number
+ *           example: 18
  *     PublicBusinessResponse:
  *       type: object
  *       properties:
@@ -65,7 +71,7 @@
  *           items: { $ref: '#/components/schemas/OrderProductInput' }
  *         paymentMethod:
  *           type: string
- *           enum: [Cash, Card, UPI]
+ *           enum: [Cash, COD, GPay, PhonePe, NetBanking, UPI, Card]
  *           default: Cash
  *     TrackedOrderItem:
  *       type: object
@@ -84,10 +90,20 @@
  *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
  *         returnStatus:
  *           type: string
- *           enum: [None, Requested, Approved, Rejected, Completed]
+ *           enum: [None, Requested, Accepted, Shipped, Delivered, Rejected]
  *         returnReason: { type: string }
+ *         returnPhotos:
+ *           type: array
+ *           items: { type: string }
+ *           description: Cloudinary URLs of return evidence photos
+ *         returnVideo:
+ *           type: string
+ *           description: Cloudinary URL of optional unboxing video
  *         totalAmount: { type: number, example: 598 }
- *         paymentMethod: { type: string, enum: [Cash, Card, UPI] }
+ *         subtotal: { type: number, example: 507 }
+ *         gstAmount: { type: number, example: 91 }
+ *         gstRate: { type: number, example: 18 }
+ *         paymentMethod: { type: string, enum: [Cash, COD, GPay, PhonePe, NetBanking, UPI, Card] }
  *         customerName: { type: string }
  *         customerPhone:
  *           type: string
@@ -99,6 +115,10 @@
  *         updatedAt: { type: string, format: date-time }
  *         returnRequestedAt: { type: string, format: date-time }
  *         returnResolvedAt: { type: string, format: date-time }
+ *         returnTrackingId: { type: string }
+ *         returnCourier: { type: string }
+ *         returnShippedAt: { type: string, format: date-time }
+ *         returnDeliveredAt: { type: string, format: date-time }
  *         business: { $ref: '#/components/schemas/PublicBusiness' }
  *     TrackedOrderResponse:
  *       type: object
@@ -116,4 +136,55 @@
  *         reason:
  *           type: string
  *           example: Product was damaged on delivery
+ *         photos:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: binary
+ *           description: Optional damage photos (up to 5, JPG/PNG/WebP)
+ *         video:
+ *           type: string
+ *           format: binary
+ *           description: Optional unboxing video (MP4/MOV, max 50 MB)
+ *     InvoiceItem:
+ *       type: object
+ *       properties:
+ *         productName: { type: string }
+ *         quantity: { type: integer }
+ *         price: { type: number }
+ *         lineTotal: { type: number }
+ *     Invoice:
+ *       type: object
+ *       properties:
+ *         orderId: { type: string }
+ *         shortOrderId: { type: string }
+ *         createdAt: { type: string, format: date-time }
+ *         customerName: { type: string }
+ *         customerPhone: { type: string }
+ *         customerAddress: { type: string }
+ *         paymentMethod: { type: string }
+ *         paymentStatus: { type: string }
+ *         items:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/InvoiceItem' }
+ *         subtotal: { type: number }
+ *         gstAmount: { type: number }
+ *         gstRate: { type: number }
+ *         totalAmount: { type: number }
+ *         business:
+ *           type: object
+ *           properties:
+ *             businessName: { type: string }
+ *             address: { type: string }
+ *             phoneNumber: { type: string }
+ *             email: { type: string }
+ *             gstin: { type: string }
+ *             gstEnabled: { type: boolean }
+ *             gstRate: { type: number }
+ *     InvoiceResponse:
+ *       type: object
+ *       properties:
+ *         success: { type: boolean, example: true }
+ *         message: { type: string, example: Invoice fetched successfully }
+ *         invoice: { $ref: '#/components/schemas/Invoice' }
  */

@@ -8,7 +8,8 @@ import {
     updateOrderStatus,
     updateReturnStatus,
     updateOrderDelivery,
-    bulkUpdateOrderStatus
+    bulkUpdateOrderStatus,
+    updatePaymentStatus
 } from "../api/orders";
 import PageShell from "../components/PageShell";
 import {
@@ -17,8 +18,14 @@ import {
     DELETABLE_STATUSES,
     COURIER_OPTIONS,
     DELIVERY_TYPES,
+    normalizeReturnStatus,
+    returnBadgeClass,
     statusBadgeClass
 } from "../utils/orderStatus";
+import { getOrderAmounts, formatPrice } from "../utils/gstDisplay";
+import { getPaymentLabelKey } from "../constants/paymentMethods";
+import { getPaymentStatusLabelKey, paymentStatusBadgeClass } from "../utils/paymentStatus";
+import { formatTimeAgo } from "../utils/timeAgo";
 
 const ORDERS_PER_PAGE = 12;
 
@@ -27,8 +34,6 @@ const inputClassName =
 
 const selectClassName =
     "rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/30";
-
-const formatPrice = (value) => `₹${Number(value).toLocaleString("en-IN")}`;
 
 const formatDate = (value) => {
     if (!value) {
@@ -61,20 +66,6 @@ const getPageNumbers = (currentPage, totalPages) => {
         .sort((left, right) => left - right);
 };
 
-const returnBadgeClass = (status) => {
-    switch (status) {
-        case "Requested":
-            return "bg-amber-500/20 text-amber-100 border-amber-400/30";
-        case "Approved":
-        case "Completed":
-            return "bg-emerald-500/20 text-emerald-100 border-emerald-400/30";
-        case "Rejected":
-            return "bg-red-500/20 text-red-100 border-red-400/30";
-        default:
-            return "bg-white/10 text-emerald-50 border-white/20";
-    }
-};
-
 const Orders = () => {
     const { t } = useTranslation();
 
@@ -90,6 +81,7 @@ const Orders = () => {
     const [statusDrafts, setStatusDrafts] = useState({});
     const [savingId, setSavingId] = useState(null);
     const [returnSavingId, setReturnSavingId] = useState(null);
+    const [returnShipDrafts, setReturnShipDrafts] = useState({});
 
     const [expandedId, setExpandedId] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
@@ -102,18 +94,34 @@ const Orders = () => {
     const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
 
     const getStatusLabel = (status) => t(`orderStatus${status}`);
-    const getReturnStatusLabel = (status) => t(`returnStatus${status}`);
+    const getReturnStatusLabel = (status) =>
+        t(`returnStatus${normalizeReturnStatus(status)}`);
 
     const getPaymentLabel = (method) => {
-        switch (method) {
-            case "Cash":
-                return t("paymentCash");
-            case "Card":
-                return t("paymentCard");
-            case "UPI":
-                return t("paymentUPI");
-            default:
-                return method;
+        const key = getPaymentLabelKey(method);
+        return key ? t(key) : method;
+    };
+
+    const getPaymentStatusLabel = (status) => {
+        const key = getPaymentStatusLabelKey(status);
+        return key ? t(key) : status;
+    };
+
+    const handleMarkPaymentPaid = async (order) => {
+        setSavingId(order._id);
+        setError("");
+        setSuccess("");
+
+        try {
+            const { data } = await updatePaymentStatus(order._id, "Paid");
+            setOrders((current) =>
+                current.map((item) => (item._id === order._id ? data.order : item))
+            );
+            setSuccess(t("paymentStatusUpdateSuccess"));
+        } catch (err) {
+            setError(err.response?.data?.message || t("paymentStatusUpdateFailed"));
+        } finally {
+            setSavingId(null);
         }
     };
 
@@ -374,26 +382,44 @@ const Orders = () => {
         }
     };
 
-    const handleReturnAction = async (order, returnStatus) => {
+    const handleReturnAction = async (order, payload) => {
+        const returnStatus = typeof payload === "string" ? payload : payload.returnStatus;
+
         setReturnSavingId(order._id);
         setError("");
         setSuccess("");
 
         try {
-            const { data } = await updateReturnStatus(order._id, returnStatus);
+            const requestPayload =
+                typeof payload === "string" ? { returnStatus: payload } : payload;
+            const { data } = await updateReturnStatus(order._id, requestPayload);
             setOrders((current) =>
                 current.map((item) => (item._id === order._id ? data.order : item))
             );
-            setSuccess(
-                returnStatus === "Approved"
-                    ? t("returnApproveSuccess")
-                    : t("returnRejectSuccess")
-            );
+            if (returnStatus === "Delivered") {
+                setSuccess(t("returnReceivedSuccess"));
+            } else if (returnStatus === "Shipped") {
+                setSuccess(t("returnShipSuccess"));
+            } else if (returnStatus === "Accepted" || returnStatus === "Approved") {
+                setSuccess(t("returnApproveSuccess"));
+            } else {
+                setSuccess(t("returnRejectSuccess"));
+            }
         } catch (err) {
             setError(err.response?.data?.message || t("returnUpdateFailed"));
         } finally {
             setReturnSavingId(null);
         }
+    };
+
+    const handleReturnShipDraftChange = (orderId, field, value) => {
+        setReturnShipDrafts((current) => ({
+            ...current,
+            [orderId]: {
+                ...current[orderId],
+                [field]: value
+            }
+        }));
     };
 
     const handleDeliveryDraftChange = (orderId, field, value) => {
@@ -976,6 +1002,15 @@ const Orders = () => {
         const draft = statusDrafts[order._id] ?? order.orderStatus;
         const hasDraftChange = draft !== order.orderStatus;
         const isExpanded = expandedId === order._id;
+        const normalizedReturnStatus = normalizeReturnStatus(order.returnStatus);
+        const returnShipDraft = returnShipDrafts[order._id] || {
+            returnTrackingId: order.returnTrackingId || "",
+            returnCourier: order.returnCourier || ""
+        };
+        const amounts = getOrderAmounts(order);
+        const needsPaymentVerification =
+            order.paymentStatus === "AwaitingPayment" || order.paymentStatus === "PaymentSubmitted";
+        const isPaymentSubmitted = order.paymentStatus === "PaymentSubmitted";
 
         return (
             <article
@@ -983,7 +1018,11 @@ const Orders = () => {
                 className={`rounded-2xl border p-4 sm:p-5 transition ${
                     selectedIds.has(order._id)
                         ? "border-emerald-400/40 bg-emerald-500/10"
-                        : "border-white/10 bg-white/5"
+                        : isPaymentSubmitted
+                          ? "border-blue-400/50 bg-blue-500/15 ring-1 ring-blue-400/30"
+                          : needsPaymentVerification
+                            ? "border-amber-400/40 bg-amber-500/10"
+                            : "border-white/10 bg-white/5"
                 }`}
             >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1009,6 +1048,20 @@ const Orders = () => {
                             >
                                 {getStatusLabel(order.orderStatus)}
                             </span>
+                            {order.paymentStatus && (
+                                <span
+                                    className={`rounded-full border px-3 py-1 text-xs font-medium ${paymentStatusBadgeClass(
+                                        order.paymentStatus
+                                    )}`}
+                                >
+                                    {getPaymentStatusLabel(order.paymentStatus)}
+                                </span>
+                            )}
+                            {isPaymentSubmitted && (
+                                <span className="rounded-full border border-blue-400/40 bg-blue-500/25 px-3 py-1 text-xs font-semibold text-blue-100">
+                                    {t("paymentVerifyUrgent")}
+                                </span>
+                            )}
                             {order.returnStatus && order.returnStatus !== "None" && (
                                 <span
                                     className={`rounded-full border px-3 py-1 text-xs font-medium ${returnBadgeClass(
@@ -1034,6 +1087,18 @@ const Orders = () => {
                                 {order.customerAddress}
                             </p>
                             <p className="text-emerald-50/80">
+                                <span className="text-emerald-100/60">{t("subtotal")}: </span>
+                                {formatPrice(amounts.subtotal)}
+                            </p>
+                            {amounts.gstAmount > 0 && (
+                                <p className="text-emerald-50/80">
+                                    <span className="text-emerald-100/60">
+                                        {t("gstAmount", { rate: amounts.gstRate })}:{" "}
+                                    </span>
+                                    {formatPrice(amounts.gstAmount)}
+                                </p>
+                            )}
+                            <p className="text-emerald-50/80">
                                 <span className="text-emerald-100/60">{t("totalAmount")}: </span>
                                 <span className="font-semibold text-emerald-200">
                                     {formatPrice(order.totalAmount)}
@@ -1043,6 +1108,44 @@ const Orders = () => {
                                 <span className="text-emerald-100/60">{t("paymentMethod")}: </span>
                                 {getPaymentLabel(order.paymentMethod)}
                             </p>
+                            {order.razorpayPaymentId && (
+                                <p className="text-emerald-50/80 sm:col-span-2">
+                                    <span className="text-emerald-100/60">{t("razorpayPaymentId")}: </span>
+                                    <span className="font-mono text-xs">{order.razorpayPaymentId}</span>
+                                </p>
+                            )}
+                            {order.paymentStatus === "PaymentSubmitted" ||
+                            order.paymentStatus === "AwaitingPayment" ? (
+                                <div className="sm:col-span-2">
+                                    {order.paymentStatus === "PaymentSubmitted" && order.paymentSubmittedAt && (
+                                        <p className="mb-2 text-xs font-medium text-blue-100">
+                                            {t("paymentSubmittedWaiting", {
+                                                time: formatTimeAgo(order.paymentSubmittedAt, t)
+                                            })}
+                                        </p>
+                                    )}
+                                    {order.paymentStatus === "AwaitingPayment" && (
+                                        <p className="mb-2 text-xs text-amber-100/80">
+                                            {t("awaitingPaymentOwnerHint")}
+                                        </p>
+                                    )}
+                                    {order.paymentStatus === "PaymentSubmitted" && (
+                                        <p className="mb-2 text-xs text-blue-100/80">
+                                            {t("paymentSubmittedOwnerHint")}
+                                        </p>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMarkPaymentPaid(order)}
+                                        disabled={savingId === order._id}
+                                        className="rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-4 py-2 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {savingId === order._id
+                                            ? t("loading")
+                                            : t("paymentMarkVerified")}
+                                    </button>
+                                </div>
+                            ) : null}
                             <p className="text-emerald-50/80 sm:col-span-2">
                                 <span className="text-emerald-100/60">{t("orderDate")}: </span>
                                 {formatDate(order.createdAt)}
@@ -1052,6 +1155,38 @@ const Orders = () => {
                                     <span className="text-emerald-100/60">{t("returnReason")}: </span>
                                     {order.returnReason}
                                 </p>
+                            )}
+                            {(order.returnPhotos?.length > 0 || order.returnVideo) && (
+                                <div className="sm:col-span-2">
+                                    <p className="mb-2 text-sm font-medium text-emerald-50">
+                                        {t("returnEvidenceTitle")}
+                                    </p>
+                                    {order.returnPhotos?.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {order.returnPhotos.map((url, index) => (
+                                                <a
+                                                    key={url}
+                                                    href={url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <img
+                                                        src={url}
+                                                        alt={t("returnEvidencePhotoAlt", { index: index + 1 })}
+                                                        className="h-24 w-24 rounded-xl object-cover transition hover:opacity-80"
+                                                    />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {order.returnVideo && (
+                                        <video
+                                            src={order.returnVideo}
+                                            controls
+                                            className="mt-3 max-h-48 w-full max-w-md rounded-xl"
+                                        />
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
@@ -1095,7 +1230,7 @@ const Orders = () => {
                             </div>
                         )}
 
-                        {order.returnStatus === "Requested" && (
+                        {normalizedReturnStatus === "Requested" && (
                             <div className="space-y-2">
                                 <p className="text-xs font-medium text-amber-100/80">
                                     {t("returnRequestPending")}
@@ -1103,7 +1238,7 @@ const Orders = () => {
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => handleReturnAction(order, "Approved")}
+                                        onClick={() => handleReturnAction(order, "Accepted")}
                                         disabled={returnSavingId === order._id}
                                         className="rounded-lg bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
                                     >
@@ -1121,7 +1256,94 @@ const Orders = () => {
                             </div>
                         )}
 
+                        {normalizedReturnStatus === "Accepted" && (
+                            <div className="space-y-3">
+                                <p className="text-xs font-medium text-indigo-100/80">
+                                    {t("returnAcceptedPending")}
+                                </p>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <div>
+                                        <label className="mb-1 block text-xs text-emerald-50/70">
+                                            {t("returnCourier")}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={returnShipDraft.returnCourier}
+                                            onChange={(event) =>
+                                                handleReturnShipDraftChange(
+                                                    order._id,
+                                                    "returnCourier",
+                                                    event.target.value
+                                                )
+                                            }
+                                            className={inputClassName}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs text-emerald-50/70">
+                                            {t("returnTrackingId")}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={returnShipDraft.returnTrackingId}
+                                            onChange={(event) =>
+                                                handleReturnShipDraftChange(
+                                                    order._id,
+                                                    "returnTrackingId",
+                                                    event.target.value
+                                                )
+                                            }
+                                            className={inputClassName}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            handleReturnAction(order, {
+                                                returnStatus: "Shipped",
+                                                returnTrackingId: returnShipDraft.returnTrackingId,
+                                                returnCourier: returnShipDraft.returnCourier
+                                            })
+                                        }
+                                        disabled={returnSavingId === order._id}
+                                        className="rounded-lg bg-indigo-500/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                                    >
+                                        {returnSavingId === order._id ? t("loading") : t("markReturnShipped")}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleReturnAction(order, "Delivered")}
+                                        disabled={returnSavingId === order._id}
+                                        className="rounded-lg bg-teal-500/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-500 disabled:opacity-60"
+                                    >
+                                        {returnSavingId === order._id ? t("loading") : t("markReturnReceived")}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {normalizedReturnStatus === "Shipped" && (
+                            <div className="space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleReturnAction(order, "Delivered")}
+                                    disabled={returnSavingId === order._id}
+                                    className="rounded-lg bg-teal-500/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-500 disabled:opacity-60"
+                                >
+                                    {returnSavingId === order._id ? t("loading") : t("markReturnReceived")}
+                                </button>
+                            </div>
+                        )}
+
                         <div className="flex flex-wrap gap-2">
+                            <Link
+                                to={`/orders/${order._id}/invoice`}
+                                className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+                            >
+                                {t("viewInvoice")}
+                            </Link>
                             <button
                                 type="button"
                                 onClick={() =>

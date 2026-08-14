@@ -114,6 +114,22 @@
  *       403:
  *         description: Phone number does not match this order
  *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/public/orders/invoice/{token}:
+ *   get:
+ *     summary: Get a printable invoice for an order using its tracking token
+ *     tags: [Public]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *         description: Secure tracking token from the order confirmation
+ *     responses:
+ *       200:
+ *         description: Invoice fetched successfully
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/InvoiceResponse' } } }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  * /api/public/businesses/{businessId}/orders/{orderId}/return-request:
  *   post:
  *     summary: Request a return for a delivered order
@@ -131,6 +147,8 @@
  *     requestBody:
  *       required: true
  *       content:
+ *         multipart/form-data:
+ *           schema: { $ref: '#/components/schemas/ReturnRequestInput' }
  *         application/json:
  *           schema: { $ref: '#/components/schemas/ReturnRequestInput' }
  *     responses:
@@ -140,5 +158,58 @@
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       403:
  *         description: Phone number does not match this order
+ *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/public/orders/pay/{token}:
+ *   get:
+ *     summary: Load payment page data for an online order
+ *     tags: [Public]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Payment page loaded
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/public/orders/pay/{token}/razorpay-order:
+ *   post:
+ *     summary: Create a Razorpay order for checkout
+ *     tags: [Public]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Razorpay order created
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/public/orders/pay/{token}/verify:
+ *   post:
+ *     summary: Verify Razorpay payment signature and confirm order
+ *     tags: [Public]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [razorpay_order_id, razorpay_payment_id, razorpay_signature]
+ *             properties:
+ *               razorpay_order_id: { type: string }
+ *               razorpay_payment_id: { type: string }
+ *               razorpay_signature: { type: string }
+ *     responses:
+ *       200:
+ *         description: Payment confirmed
+ *       400: { $ref: '#/components/responses/ValidationError' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */

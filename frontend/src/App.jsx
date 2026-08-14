@@ -13,6 +13,8 @@ import Storefront from "./pages/Storefront";
 import TrackOrder from "./pages/TrackOrder";
 import DeliverOrder from "./pages/DeliverOrder";
 import MyOrders from "./pages/MyOrders";
+import Invoice from "./pages/Invoice";
+import Payment from "./pages/Payment";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 
@@ -21,10 +23,13 @@ const App = () => {
         <BrowserRouter>
             <Routes>
                 <Route path="/store/:storeSlug" element={<Storefront />} />
+                <Route path="/store/:storeSlug/pay/:token" element={<Payment />} />
                 <Route path="/store/:storeSlug/track/:token" element={<TrackOrder />} />
                 <Route path="/store/:storeSlug/track" element={<TrackOrder />} />
                 <Route path="/store/:storeSlug/my-orders" element={<MyOrders />} />
                 <Route path="/track/:token" element={<TrackOrder />} />
+                <Route path="/pay/:token" element={<Payment />} />
+                <Route path="/invoice/:token" element={<Invoice />} />
                 <Route path="/deliver/:deliveryToken" element={<DeliverOrder />} />
                 <Route path="/my-orders" element={<MyOrders />} />
                 <Route path="/track-order" element={<TrackOrder />} />
@@ -43,6 +48,7 @@ const App = () => {
                         <Route path="/business" element={<BusinessSetup />} />
                         <Route path="/products" element={<Products />} />
                         <Route path="/orders" element={<Orders />} />
+                        <Route path="/orders/:orderId/invoice" element={<Invoice ownerMode />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
                 </Route>

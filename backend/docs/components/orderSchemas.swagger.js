@@ -62,9 +62,18 @@
  *         totalAmount:
  *           type: number
  *           example: 598
+ *         subtotal:
+ *           type: number
+ *           example: 507
+ *         gstAmount:
+ *           type: number
+ *           example: 91
+ *         gstRate:
+ *           type: number
+ *           example: 18
  *         paymentMethod:
  *           type: string
- *           enum: [Cash, Card, UPI]
+ *           enum: [Cash, COD, GPay, PhonePe, NetBanking, UPI, Card]
  *           default: Cash
  *         paymentStatus:
  *           type: string
@@ -76,14 +85,31 @@
  *           default: Pending
  *         returnStatus:
  *           type: string
- *           enum: [None, Requested, Approved, Rejected, Completed]
+ *           enum: [None, Requested, Accepted, Shipped, Delivered, Rejected]
  *           default: None
  *         returnReason:
  *           type: string
+ *         returnPhotos:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Cloudinary URLs of return evidence photos
+ *         returnVideo:
+ *           type: string
+ *           description: Cloudinary URL of optional unboxing video
  *         returnRequestedAt:
  *           type: string
  *           format: date-time
  *         returnResolvedAt:
+ *           type: string
+ *           format: date-time
+ *         razorpayOrderId:
+ *           type: string
+ *           example: order_xxxxxxxx
+ *         razorpayPaymentId:
+ *           type: string
+ *           example: pay_xxxxxxxx
+ *         paidAt:
  *           type: string
  *           format: date-time
  *         trackingToken:
@@ -119,9 +145,9 @@
  *             $ref: '#/components/schemas/OrderProductInput'
  *         paymentMethod:
  *           type: string
- *           enum: [Cash, Card, UPI]
+ *           enum: [Cash, COD, GPay, PhonePe, NetBanking, UPI, Card]
  *           default: Cash
- *           example: UPI
+ *           example: GPay
  *     OrderStatusUpdateInput:
  *       type: object
  *       required: [orderStatus]
@@ -136,6 +162,12 @@
  *       properties:
  *         returnStatus:
  *           type: string
- *           enum: [Approved, Rejected]
- *           example: Approved
+ *           enum: [Approved, Accepted, Rejected, Shipped, Delivered]
+ *           example: Accepted
+ *         returnTrackingId:
+ *           type: string
+ *           maxLength: 100
+ *         returnCourier:
+ *           type: string
+ *           maxLength: 100
  */

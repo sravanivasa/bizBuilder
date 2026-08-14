@@ -1,7 +1,14 @@
+import { CHECKOUT_PAYMENT_METHODS } from "../constants/paymentMethods";
+
 const CUSTOMER_NAME_MIN = 2;
 const CUSTOMER_NAME_MAX = 100;
 const ADDRESS_MIN = 10;
-const PAYMENT_METHODS = ["Cash", "UPI", "Card"];
+
+const CHECKOUT_ERROR_PARAMS = {
+    checkoutNameMinLength: { min: CUSTOMER_NAME_MIN },
+    checkoutNameMaxLength: { max: CUSTOMER_NAME_MAX },
+    checkoutAddressMinLength: { min: ADDRESS_MIN }
+};
 
 export const normalizeIndianPhone = (value) => value.replace(/[\s-]/g, "");
 
@@ -24,39 +31,56 @@ export const formatIndianPhone = (value) => {
     return cleaned;
 };
 
-export const validateCheckoutForm = (checkout, cartItems, t) => {
+export const getCheckoutFieldErrors = (checkout, cartItems) => {
     const errors = {};
     const name = checkout.customerName.trim();
 
     if (!name) {
-        errors.customerName = t("validationCustomerNameRequired");
+        errors.customerName = "checkoutNameRequired";
     } else if (name.length < CUSTOMER_NAME_MIN) {
-        errors.customerName = t("validationCustomerNameMinLength", { min: CUSTOMER_NAME_MIN });
+        errors.customerName = "checkoutNameMinLength";
     } else if (name.length > CUSTOMER_NAME_MAX) {
-        errors.customerName = t("validationCustomerNameMaxLength", { max: CUSTOMER_NAME_MAX });
+        errors.customerName = "checkoutNameMaxLength";
     }
 
     const phone = checkout.customerPhone.trim();
     if (!phone) {
-        errors.customerPhone = t("validationPhoneRequired");
+        errors.customerPhone = "checkoutPhoneRequired";
     } else if (!isValidIndianPhone(phone)) {
-        errors.customerPhone = t("validationPhoneInvalid");
+        errors.customerPhone = "checkoutPhoneInvalid";
     }
 
     const address = checkout.customerAddress.trim();
     if (!address) {
-        errors.customerAddress = t("validationAddressRequired");
+        errors.customerAddress = "checkoutAddressRequired";
     } else if (address.length < ADDRESS_MIN) {
-        errors.customerAddress = t("validationAddressMinLength", { min: ADDRESS_MIN });
+        errors.customerAddress = "checkoutAddressMinLength";
     }
 
-    if (!checkout.paymentMethod || !PAYMENT_METHODS.includes(checkout.paymentMethod)) {
-        errors.paymentMethod = t("validationPaymentRequired");
+    if (!checkout.paymentMethod || !CHECKOUT_PAYMENT_METHODS.includes(checkout.paymentMethod)) {
+        errors.paymentMethod = "checkoutPaymentRequired";
     }
 
     if (!cartItems.length) {
-        errors.cart = t("validationCartEmpty");
+        errors.cart = "checkoutCartEmpty";
     }
 
     return errors;
+};
+
+export const translateCheckoutFieldErrors = (errorKeys, t) => {
+    return Object.fromEntries(
+        Object.entries(errorKeys).map(([field, key]) => [
+            field,
+            t(key, CHECKOUT_ERROR_PARAMS[key] || {})
+        ])
+    );
+};
+
+export const canEnableCheckoutSubmit = (checkout, cartItems) => {
+    return Object.keys(getCheckoutFieldErrors(checkout, cartItems)).length === 0;
+};
+
+export const validateCheckoutForm = (checkout, cartItems, t) => {
+    return translateCheckoutFieldErrors(getCheckoutFieldErrors(checkout, cartItems), t);
 };

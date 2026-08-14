@@ -30,6 +30,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
+    "razorpay": "^2.9.8",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   },

@@ -1,6 +1,7 @@
 const { body } = require("express-validator");
 const { ALL_ORDER_STATUSES } = require("../utils/orderStatus");
 const { COURIER_OPTIONS } = require("../utils/courierTracking");
+const { PAYMENT_METHODS, PAYMENT_STATUSES } = require("../utils/paymentMethods");
 
 const createOrderValidation = [
     body("businessId")
@@ -36,7 +37,7 @@ const createOrderValidation = [
 
     body("paymentMethod")
         .optional()
-        .isIn(["Cash", "Card", "UPI"])
+        .isIn(PAYMENT_METHODS)
         .withMessage("Invalid payment method")
 ];
 
@@ -100,8 +101,20 @@ const updateOrderDeliveryValidation = [
 
 const updateReturnStatusValidation = [
     body("returnStatus")
-        .isIn(["Approved", "Rejected"])
-        .withMessage("Return status must be Approved or Rejected")
+        .isIn(["Approved", "Accepted", "Rejected", "Shipped", "Delivered"])
+        .withMessage("Return status must be Approved, Accepted, Rejected, Shipped, or Delivered"),
+
+    body("returnTrackingId")
+        .optional()
+        .trim()
+        .isLength({ max: 100 })
+        .withMessage("Return tracking ID must be at most 100 characters"),
+
+    body("returnCourier")
+        .optional()
+        .trim()
+        .isLength({ max: 100 })
+        .withMessage("Return courier must be at most 100 characters")
 ];
 
 const BULK_ORDER_STATUSES = ["Processing", "Shipped", "Cancelled"];
@@ -120,11 +133,18 @@ const bulkUpdateOrderStatusValidation = [
         .withMessage("Bulk status must be Processing, Shipped, or Cancelled")
 ];
 
+const updatePaymentStatusValidation = [
+    body("paymentStatus")
+        .isIn(PAYMENT_STATUSES)
+        .withMessage("Invalid payment status")
+];
+
 module.exports = {
     createOrderValidation,
     updateOrderStatusValidation,
     updateReturnStatusValidation,
     updateOrderDeliveryValidation,
     bulkUpdateOrderStatusValidation,
+    updatePaymentStatusValidation,
     COURIER_OPTIONS
 };

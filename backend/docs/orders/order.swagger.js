@@ -82,6 +82,19 @@
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/orders/{id}/invoice:
+ *   get:
+ *     summary: Get a printable invoice for an order (business owner)
+ *     tags: [Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ $ref: '#/components/parameters/OrderId' }]
+ *     responses:
+ *       200:
+ *         description: Invoice fetched successfully
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/InvoiceResponse' } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  * /api/orders/{id}/return:
  *   put:
  *     summary: Approve or reject a customer return request

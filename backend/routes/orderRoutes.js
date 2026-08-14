@@ -8,7 +8,8 @@ const {
     updateOrderStatusValidation,
     updateReturnStatusValidation,
     updateOrderDeliveryValidation,
-    bulkUpdateOrderStatusValidation
+    bulkUpdateOrderStatusValidation,
+    updatePaymentStatusValidation
 } = require("../validators/orderValidator");
 
 const {
@@ -19,7 +20,9 @@ const {
     bulkUpdateOrderStatus,
     updateReturnStatus,
     deleteOrder,
-    updateOrderDelivery
+    updateOrderDelivery,
+    getOrderInvoice,
+    updatePaymentStatus
 } = require("../controllers/orderController");
 
 router.post("/", authMiddleware, ...createOrderValidation, createOrder);
@@ -30,6 +33,7 @@ router.post(
     bulkUpdateOrderStatus
 );
 router.get("/", authMiddleware, getMyOrders);
+router.get("/:id/invoice", authMiddleware, validateObjectId("id"), getOrderInvoice);
 router.get("/:id", authMiddleware, validateObjectId("id"), getOrderById);
 router.put(
     "/:id",
@@ -51,6 +55,13 @@ router.put(
     validateObjectId("id"),
     ...updateOrderDeliveryValidation,
     updateOrderDelivery
+);
+router.put(
+    "/:id/payment",
+    authMiddleware,
+    validateObjectId("id"),
+    ...updatePaymentStatusValidation,
+    updatePaymentStatus
 );
 router.delete("/:id", authMiddleware, validateObjectId("id"), deleteOrder);
 

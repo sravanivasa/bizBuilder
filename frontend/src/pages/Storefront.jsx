@@ -1,24 +1,56 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { createPublicOrder, getPublicBusiness, getPublicProducts } from "../api/public";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { getCategoryLabelKey } from "../constants/businessCategories";
 import {
+    canEnableCheckoutSubmit,
     formatIndianPhone,
     validateCheckoutForm
 } from "../utils/checkoutValidation";
-import { saveCustomerOrder, getStorePath } from "../utils/customerOrdersStorage";
+import { calculateGstBreakdown, formatPrice } from "../utils/gstDisplay";
+import { CHECKOUT_PAYMENT_METHODS, getPaymentLabelKey, isOnlinePaymentMethod } from "../constants/paymentMethods";
+import { canViewInvoice } from "../utils/paymentStatus";
+import {
+    getLastCheckoutDetails,
+    getStorePath,
+    saveCustomerOrder
+} from "../utils/customerOrdersStorage";
 
 const inputClassName =
     "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-emerald-100/60 outline-none transition focus:border-emerald-300 focus:bg-white/15 focus:ring-2 focus:ring-emerald-400/30";
 
-const selectClassName =
-    "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white outline-none transition focus:border-emerald-300 focus:bg-white/15 focus:ring-2 focus:ring-emerald-400/30 [&>option]:bg-slate-900";
+const inputErrorClassName =
+    "border-red-400/50 focus:border-red-400 focus:ring-red-400/30";
 
 const labelClassName = "mb-2 block text-sm font-medium text-emerald-50";
 
 const fieldErrorClassName = "mt-1.5 text-sm text-red-300";
+
+const getCheckoutInputClassName = (hasError) =>
+    `${inputClassName}${hasError ? ` ${inputErrorClassName}` : ""}`;
+
+const TotalsBreakdown = ({ amounts, t, compact = false }) => (
+    <div className={`space-y-1 ${compact ? "text-sm" : ""}`}>
+        <div className="flex justify-between text-emerald-50/80">
+            <span>{t("subtotal")}</span>
+            <span>{formatPrice(amounts.subtotal)}</span>
+        </div>
+        {amounts.gstAmount > 0 && (
+            <div className="flex justify-between text-emerald-50/80">
+                <span>{t("gstAmount", { rate: amounts.gstRate })}</span>
+                <span>{formatPrice(amounts.gstAmount)}</span>
+            </div>
+        )}
+        <div className={`flex justify-between text-white ${compact ? "" : "text-base"}`}>
+            <span className={compact ? "font-medium" : ""}>{t("totalAmount")}</span>
+            <span className={`font-bold text-emerald-300 ${compact ? "text-lg" : "text-lg"}`}>
+                {formatPrice(amounts.totalAmount)}
+            </span>
+        </div>
+    </div>
+);
 
 const CHECKOUT_FIELDS = [
     "customerName",
@@ -27,13 +59,11 @@ const CHECKOUT_FIELDS = [
     "paymentMethod"
 ];
 
-const formatPrice = (value) => `₹${Number(value).toLocaleString("en-IN")}`;
-
 const EMPTY_CHECKOUT = {
     customerName: "",
     customerPhone: "",
     customerAddress: "",
-    paymentMethod: "Cash"
+    paymentMethod: "COD"
 };
 
 const getStockBadge = (stock, t) => {
@@ -79,6 +109,7 @@ const LoadingSkeleton = () => (
 
 const Storefront = () => {
     const { storeSlug } = useParams();
+    const navigate = useNavigate();
     const { t } = useTranslation();
 
     const [business, setBusiness] = useState(null);
@@ -91,8 +122,8 @@ const Storefront = () => {
     const [checkoutOpen, setCheckoutOpen] = useState(false);
     const [checkout, setCheckout] = useState(EMPTY_CHECKOUT);
     const [checkoutError, setCheckoutError] = useState("");
-    const [fieldErrors, setFieldErrors] = useState({});
     const [touched, setTouched] = useState({});
+    const [validationAttempted, setValidationAttempted] = useState(false);
     const [placingOrder, setPlacingOrder] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(null);
     const [linkCopied, setLinkCopied] = useState(false);
@@ -139,12 +170,20 @@ const Storefront = () => {
         0
     );
 
+    const orderAmounts = useMemo(
+        () => calculateGstBreakdown(cartTotal, business),
+        [cartTotal, business]
+    );
+
     const checkoutValidationErrors = useMemo(
         () => validateCheckoutForm(checkout, cartItems, t),
         [checkout, cartItems, t]
     );
 
-    const isCheckoutValid = Object.keys(checkoutValidationErrors).length === 0;
+    const canPlaceOrder = canEnableCheckoutSubmit(checkout, cartItems);
+
+    const shouldShowFieldError = (field) =>
+        (touched[field] || validationAttempted) && checkoutValidationErrors[field];
 
     const addToCart = (product) => {
         const current = cart[product._id] || 0;
@@ -187,45 +226,38 @@ const Storefront = () => {
             return;
         }
 
+        const savedDetails = getLastCheckoutDetails(storeSlug, business?._id);
+        const paymentMethod = CHECKOUT_PAYMENT_METHODS.includes(checkout.paymentMethod)
+            ? checkout.paymentMethod
+            : EMPTY_CHECKOUT.paymentMethod;
+
+        setCheckout({
+            customerName: savedDetails?.customerName || "",
+            customerPhone: savedDetails?.customerPhone || "",
+            customerAddress: savedDetails?.customerAddress || "",
+            paymentMethod
+        });
         setCheckoutError("");
-        setFieldErrors({});
         setTouched({});
+        setValidationAttempted(false);
         setCheckoutOpen(true);
         setCartOpen(false);
     };
 
     const handleCheckoutChange = (field, value) => {
-        setCheckout((prev) => {
-            const nextCheckout = { ...prev, [field]: value };
-
-            if (touched[field]) {
-                const errors = validateCheckoutForm(nextCheckout, cartItems, t);
-                setFieldErrors((prevErrors) => ({
-                    ...prevErrors,
-                    [field]: errors[field]
-                }));
-            }
-
-            return nextCheckout;
-        });
+        setCheckout((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleCheckoutBlur = (field) => {
         setTouched((prev) => ({ ...prev, [field]: true }));
-        const errors = validateCheckoutForm(checkout, cartItems, t);
-        setFieldErrors((prev) => ({
-            ...prev,
-            [field]: errors[field]
-        }));
     };
 
     const handlePlaceOrder = async (event) => {
         event.preventDefault();
         setCheckoutError("");
 
-        const errors = validateCheckoutForm(checkout, cartItems, t);
-        if (Object.keys(errors).length > 0) {
-            setFieldErrors(errors);
+        if (!canPlaceOrder) {
+            setValidationAttempted(true);
             setTouched(
                 CHECKOUT_FIELDS.reduce((acc, field) => {
                     acc[field] = true;
@@ -258,23 +290,45 @@ const Storefront = () => {
                 shortOrderId: data.order._id?.slice(-6).toUpperCase(),
                 trackingToken: data.order.trackingToken,
                 phone: data.order.customerPhone,
+                customerName: data.order.customerName,
+                customerAddress: data.order.customerAddress,
                 businessName: business?.businessName,
                 totalAmount: data.order.totalAmount,
                 createdAt: data.order.createdAt,
-                orderStatus: data.order.orderStatus
+                orderStatus: data.order.orderStatus,
+                paymentStatus: data.order.paymentStatus,
+                paymentMethod: data.order.paymentMethod
             });
+
+            if (
+                isOnlinePaymentMethod(data.order.paymentMethod) &&
+                data.order.trackingToken
+            ) {
+                const storePath =
+                    getStorePath(business?._id, business?.slug || storeSlug) ||
+                    `/store/${storeSlug}`;
+                setCart({});
+                setCheckout(EMPTY_CHECKOUT);
+                setTouched({});
+                setValidationAttempted(false);
+                setCheckoutOpen(false);
+                navigate(`${storePath}/pay/${data.order.trackingToken}`);
+                loadStore();
+                return;
+            }
+
+            setCart({});
+            setCheckout(EMPTY_CHECKOUT);
+            setTouched({});
+            setValidationAttempted(false);
+            setCheckoutOpen(false);
+            await loadStore();
 
             setOrderSuccess({
                 order: data.order,
                 trackingUrl: data.trackingUrl,
                 whatsappEnabled: data.whatsappEnabled
             });
-            setCart({});
-            setCheckout(EMPTY_CHECKOUT);
-            setFieldErrors({});
-            setTouched({});
-            setCheckoutOpen(false);
-            await loadStore();
         } catch (err) {
             setCheckoutError(err.response?.data?.message || t("storefrontOrderFailed"));
         } finally {
@@ -343,6 +397,14 @@ const Storefront = () => {
                         <p className="mt-4 text-lg font-semibold text-white">
                             {t("totalAmount")}: {formatPrice(order.totalAmount)}
                         </p>
+                        {order.trackingToken && canViewInvoice(order.paymentStatus) && (
+                            <Link
+                                to={`/invoice/${order.trackingToken}`}
+                                className="mt-3 inline-flex text-sm font-medium text-emerald-300 transition hover:text-emerald-200"
+                            >
+                                {t("viewInvoice")} →
+                            </Link>
+                        )}
                         {whatsappEnabled ? (
                             <p className="mt-3 text-sm text-emerald-100/80">
                                 {t("storefrontOrderSuccessWhatsApp")}
@@ -556,7 +618,9 @@ const Storefront = () => {
                         <span className="font-semibold">
                             {t("storefrontCart")} ({cartCount})
                         </span>
-                        <span className="font-bold text-emerald-300">{formatPrice(cartTotal)}</span>
+                        <span className="font-bold text-emerald-300">
+                            {formatPrice(orderAmounts.totalAmount)}
+                        </span>
                     </button>
                 </div>
             )}
@@ -657,12 +721,7 @@ const Storefront = () => {
 
                         {cartItems.length > 0 && (
                             <div className="mt-6 border-t border-white/10 pt-4">
-                                <div className="flex justify-between text-white">
-                                    <span>{t("totalAmount")}</span>
-                                    <span className="text-lg font-bold text-emerald-300">
-                                        {formatPrice(cartTotal)}
-                                    </span>
-                                </div>
+                                <TotalsBreakdown amounts={orderAmounts} t={t} compact />
                                 <button
                                     type="button"
                                     onClick={openCheckout}
@@ -704,6 +763,15 @@ const Storefront = () => {
                         </div>
 
                         <form onSubmit={handlePlaceOrder} className="mt-6 space-y-4">
+                            {validationAttempted && !canPlaceOrder && (
+                                <p
+                                    role="alert"
+                                    className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+                                >
+                                    {t("checkoutFillRequiredFields")}
+                                </p>
+                            )}
+
                             <div>
                                 <label className={labelClassName} htmlFor="customerName">
                                     {t("customerName")}
@@ -716,10 +784,15 @@ const Storefront = () => {
                                         handleCheckoutChange("customerName", e.target.value)
                                     }
                                     onBlur={() => handleCheckoutBlur("customerName")}
-                                    className={inputClassName}
+                                    aria-invalid={Boolean(shouldShowFieldError("customerName"))}
+                                    className={getCheckoutInputClassName(
+                                        shouldShowFieldError("customerName")
+                                    )}
                                 />
-                                {touched.customerName && fieldErrors.customerName && (
-                                    <p className={fieldErrorClassName}>{fieldErrors.customerName}</p>
+                                {shouldShowFieldError("customerName") && (
+                                    <p className={fieldErrorClassName}>
+                                        {checkoutValidationErrors.customerName}
+                                    </p>
                                 )}
                             </div>
 
@@ -735,10 +808,15 @@ const Storefront = () => {
                                         handleCheckoutChange("customerPhone", e.target.value)
                                     }
                                     onBlur={() => handleCheckoutBlur("customerPhone")}
-                                    className={inputClassName}
+                                    aria-invalid={Boolean(shouldShowFieldError("customerPhone"))}
+                                    className={getCheckoutInputClassName(
+                                        shouldShowFieldError("customerPhone")
+                                    )}
                                 />
-                                {touched.customerPhone && fieldErrors.customerPhone && (
-                                    <p className={fieldErrorClassName}>{fieldErrors.customerPhone}</p>
+                                {shouldShowFieldError("customerPhone") && (
+                                    <p className={fieldErrorClassName}>
+                                        {checkoutValidationErrors.customerPhone}
+                                    </p>
                                 )}
                             </div>
 
@@ -754,46 +832,68 @@ const Storefront = () => {
                                         handleCheckoutChange("customerAddress", e.target.value)
                                     }
                                     onBlur={() => handleCheckoutBlur("customerAddress")}
-                                    className={inputClassName}
+                                    aria-invalid={Boolean(shouldShowFieldError("customerAddress"))}
+                                    className={getCheckoutInputClassName(
+                                        shouldShowFieldError("customerAddress")
+                                    )}
                                 />
-                                {touched.customerAddress && fieldErrors.customerAddress && (
-                                    <p className={fieldErrorClassName}>{fieldErrors.customerAddress}</p>
+                                {shouldShowFieldError("customerAddress") && (
+                                    <p className={fieldErrorClassName}>
+                                        {checkoutValidationErrors.customerAddress}
+                                    </p>
                                 )}
                             </div>
 
                             <div>
-                                <label className={labelClassName} htmlFor="paymentMethod">
-                                    {t("paymentMethod")}
-                                </label>
-                                <select
-                                    id="paymentMethod"
-                                    value={checkout.paymentMethod}
-                                    onChange={(e) =>
-                                        handleCheckoutChange("paymentMethod", e.target.value)
-                                    }
-                                    onBlur={() => handleCheckoutBlur("paymentMethod")}
-                                    className={selectClassName}
+                                <p className={labelClassName}>{t("paymentMethod")}</p>
+                                <div
+                                    className={`grid gap-2 sm:grid-cols-2 ${
+                                        shouldShowFieldError("paymentMethod")
+                                            ? "rounded-xl border border-red-400/50 p-2"
+                                            : ""
+                                    }`}
                                 >
-                                    <option value="Cash">{t("paymentCash")}</option>
-                                    <option value="UPI">{t("paymentUPI")}</option>
-                                    <option value="Card">{t("paymentCard")}</option>
-                                </select>
-                                {touched.paymentMethod && fieldErrors.paymentMethod && (
-                                    <p className={fieldErrorClassName}>{fieldErrors.paymentMethod}</p>
+                                    {CHECKOUT_PAYMENT_METHODS.map((method) => (
+                                        <label
+                                            key={method}
+                                            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                                                checkout.paymentMethod === method
+                                                    ? "border-emerald-400/50 bg-emerald-500/15"
+                                                    : "border-white/20 bg-white/5 hover:bg-white/10"
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="paymentMethod"
+                                                value={method}
+                                                checked={checkout.paymentMethod === method}
+                                                onChange={(e) =>
+                                                    handleCheckoutChange("paymentMethod", e.target.value)
+                                                }
+                                                onBlur={() => handleCheckoutBlur("paymentMethod")}
+                                                className="h-4 w-4 accent-emerald-400"
+                                            />
+                                            <span className="text-sm font-medium text-white">
+                                                {t(getPaymentLabelKey(method))}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {shouldShowFieldError("paymentMethod") && (
+                                    <p className={fieldErrorClassName}>
+                                        {checkoutValidationErrors.paymentMethod}
+                                    </p>
                                 )}
                             </div>
 
                             <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-4">
-                                <div className="flex justify-between text-white">
-                                    <span>{t("totalAmount")}</span>
-                                    <span className="text-lg font-bold text-emerald-300">
-                                        {formatPrice(cartTotal)}
-                                    </span>
-                                </div>
+                                <TotalsBreakdown amounts={orderAmounts} t={t} />
                             </div>
 
-                            {fieldErrors.cart && (
-                                <p className={fieldErrorClassName}>{fieldErrors.cart}</p>
+                            {validationAttempted && checkoutValidationErrors.cart && (
+                                <p className={fieldErrorClassName}>
+                                    {checkoutValidationErrors.cart}
+                                </p>
                             )}
 
                             {checkoutError && (
@@ -804,7 +904,7 @@ const Storefront = () => {
 
                             <button
                                 type="submit"
-                                disabled={placingOrder || !isCheckoutValid}
+                                disabled={placingOrder}
                                 className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:from-emerald-400 hover:to-teal-400 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {placingOrder ? t("loading") : t("storefrontPlaceOrder")}

@@ -21,6 +21,7 @@ const businessRoutes = require("./routes/businessRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const publicRoutes = require("./routes/publicRoutes");
+const webhookRoutes = require("./routes/webhookRoutes");
 const errorHandler = require("./middleware/errorMiddleware");
 
 validateEnv();
@@ -47,6 +48,12 @@ app.use(
         origin: corsOrigin.split(",").map((origin) => origin.trim()),
         credentials: true
     })
+);
+
+app.use(
+    "/api/webhooks",
+    express.raw({ type: "application/json" }),
+    webhookRoutes
 );
 
 app.use(express.json({ limit: "10mb" }));
@@ -85,7 +92,10 @@ app.use((error, req, res, next) => {
         return res.status(400).json({ success: false, message });
     }
 
-    if (error.message === "Upload a JPG, PNG, or WebP image file") {
+    if (
+        error.message === "Upload a JPG, PNG, or WebP image file" ||
+        error.message === "Upload JPG, PNG, WebP images or MP4/MOV video only"
+    ) {
         return res.status(400).json({ success: false, message: error.message });
     }
 

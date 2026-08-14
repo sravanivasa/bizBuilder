@@ -9,14 +9,23 @@ import {
     getLastPhoneForStore,
     getStorePath
 } from "../utils/customerOrdersStorage";
-import { statusBadgeClass } from "../utils/orderStatus";
+import {
+    canRequestReturn,
+    normalizeReturnStatus,
+    returnBadgeClass,
+    RETURN_PROGRESS_STAGES,
+    statusBadgeClass
+} from "../utils/orderStatus";
+import { getOrderAmounts, formatPrice } from "../utils/gstDisplay";
+import { getPaymentLabelKey } from "../constants/paymentMethods";
+import { getPaymentStatusLabelKey, paymentStatusBadgeClass, canViewInvoice } from "../utils/paymentStatus";
+import { buildPhoneLink, buildWhatsAppLink } from "../utils/contactShop";
+import { formatDateTime } from "../utils/timeAgo";
 
 const inputClassName =
     "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-emerald-100/60 outline-none transition focus:border-emerald-300 focus:bg-white/15 focus:ring-2 focus:ring-emerald-400/30";
 
 const labelClassName = "mb-2 block text-sm font-medium text-emerald-50";
-
-const formatPrice = (value) => `₹${Number(value).toLocaleString("en-IN")}`;
 
 const formatDate = (value) => {
     if (!value) {
@@ -30,20 +39,6 @@ const formatDate = (value) => {
         hour: "2-digit",
         minute: "2-digit"
     });
-};
-
-const returnBadgeClass = (status) => {
-    switch (status) {
-        case "Requested":
-            return "bg-amber-500/20 text-amber-100 border-amber-400/30";
-        case "Approved":
-        case "Completed":
-            return "bg-emerald-500/20 text-emerald-100 border-emerald-400/30";
-        case "Rejected":
-            return "bg-red-500/20 text-red-100 border-red-400/30";
-        default:
-            return "bg-white/10 text-emerald-50 border-white/20";
-    }
 };
 
 const TrackOrder = () => {
@@ -66,22 +61,29 @@ const TrackOrder = () => {
     const [order, setOrder] = useState(null);
 
     const [returnReason, setReturnReason] = useState("");
+    const [returnPhotoFiles, setReturnPhotoFiles] = useState([]);
+    const [returnVideoFile, setReturnVideoFile] = useState(null);
+    const [photoPreviewUrls, setPhotoPreviewUrls] = useState([]);
+    const [videoPreviewUrl, setVideoPreviewUrl] = useState("");
     const [returnOpen, setReturnOpen] = useState(false);
     const [returnLoading, setReturnLoading] = useState(false);
     const [returnSuccess, setReturnSuccess] = useState("");
     const autoSubmitted = useRef(false);
 
     const getStatusLabel = (status) => t(`orderStatus${status}`);
-    const getReturnStatusLabel = (status) => t(`returnStatus${status}`);
+    const getReturnStatusLabel = (status) =>
+        t(`returnStatus${normalizeReturnStatus(status)}`);
 
     const effectiveBusinessId = resolvedStoreKey || businessId.trim();
 
     const effectivePhone = phone.trim() || order?.customerPhone || "";
 
-    const canRequestReturn =
+    const normalizedReturnStatus = order ? normalizeReturnStatus(order.returnStatus) : "None";
+
+    const showReturnProgress =
         order &&
-        ["Delivered", "Completed"].includes(order.orderStatus) &&
-        (!order.returnStatus || order.returnStatus === "None");
+        normalizedReturnStatus !== "None" &&
+        normalizedReturnStatus !== "Rejected";
 
     const handleTrack = async (event) => {
         event.preventDefault();
@@ -135,6 +137,49 @@ const TrackOrder = () => {
         }
     };
 
+    const resetReturnEvidence = () => {
+        photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+        if (videoPreviewUrl) {
+            URL.revokeObjectURL(videoPreviewUrl);
+        }
+        setReturnPhotoFiles([]);
+        setReturnVideoFile(null);
+        setPhotoPreviewUrls([]);
+        setVideoPreviewUrl("");
+    };
+
+    const handleReturnPhotoSelect = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) {
+            return;
+        }
+
+        photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+        const combined = [...returnPhotoFiles, ...files].slice(0, 5);
+        setReturnPhotoFiles(combined);
+        setPhotoPreviewUrls(combined.map((file) => URL.createObjectURL(file)));
+        event.target.value = "";
+    };
+
+    const handleReturnVideoSelect = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        if (videoPreviewUrl) {
+            URL.revokeObjectURL(videoPreviewUrl);
+        }
+        setReturnVideoFile(file);
+        setVideoPreviewUrl(URL.createObjectURL(file));
+        event.target.value = "";
+    };
+
+    const closeReturnModal = () => {
+        setReturnOpen(false);
+        resetReturnEvidence();
+    };
+
     const handleReturnRequest = async (event) => {
         event.preventDefault();
         setReturnSuccess("");
@@ -154,14 +199,20 @@ const TrackOrder = () => {
         setReturnLoading(true);
 
         try {
-            const { data } = await requestPublicReturn(returnBusinessId, orderId.trim(), {
-                phone: formatIndianPhone(effectivePhone),
-                reason: returnReason.trim()
-            });
+            const formData = new FormData();
+            formData.append("phone", formatIndianPhone(effectivePhone));
+            formData.append("reason", returnReason.trim());
+            returnPhotoFiles.forEach((file) => formData.append("photos", file));
+            if (returnVideoFile) {
+                formData.append("video", returnVideoFile);
+            }
+
+            const { data } = await requestPublicReturn(returnBusinessId, orderId.trim(), formData);
             setOrder(data.order);
             setReturnSuccess(t("returnRequestSuccess"));
             setReturnOpen(false);
             setReturnReason("");
+            resetReturnEvidence();
         } catch (err) {
             setError(err.response?.data?.message || t("returnRequestFailed"));
         } finally {
@@ -263,6 +314,24 @@ const TrackOrder = () => {
         : "/my-orders";
 
     const shopPath = routeStoreSlug ? getStorePath(routeStoreSlug) : "/";
+
+    const payPath = routeToken
+        ? routeStoreSlug
+            ? `${getStorePath(routeStoreSlug)}/pay/${routeToken}`
+            : `/pay/${routeToken}`
+        : null;
+
+    const shopPhone = order?.business?.phoneNumber;
+    const phoneLink = buildPhoneLink(shopPhone);
+    const whatsAppLink = buildWhatsAppLink(
+        shopPhone,
+        order
+            ? t("contactShopWhatsAppMessage", {
+                  id: order.shortOrderId,
+                  amount: formatPrice(getOrderAmounts(order).totalAmount)
+              })
+            : ""
+    );
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-slate-950">
@@ -429,18 +498,116 @@ const TrackOrder = () => {
                             </span>
                         </p>
 
+                        {order.paymentStatus === "AwaitingPayment" && payPath && (
+                            <div className="rounded-xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                                <p>{t("trackPaymentAwaitingMessage")}</p>
+                                <Link
+                                    to={payPath}
+                                    className="mt-2 inline-flex font-medium text-amber-50 underline"
+                                >
+                                    {t("trackPaymentCompleteLink")} →
+                                </Link>
+                            </div>
+                        )}
+
+                        {order.paymentStatus === "PaymentSubmitted" && (
+                            <div className="rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-3 text-sm text-blue-100">
+                                <p>{t("trackPaymentSubmittedMessage")}</p>
+                                {order.paymentSubmittedAt && (
+                                    <p className="mt-1 text-xs text-blue-100/80">
+                                        {t("paymentSubmittedAt")}: {formatDateTime(order.paymentSubmittedAt)}
+                                    </p>
+                                )}
+                                {(phoneLink || whatsAppLink) && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {phoneLink && (
+                                            <a
+                                                href={phoneLink}
+                                                className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                                            >
+                                                {t("contactShopPhone")}
+                                            </a>
+                                        )}
+                                        {whatsAppLink && (
+                                            <a
+                                                href={whatsAppLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+                                            >
+                                                {t("contactShopWhatsApp")}
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {order.paymentStatus === "Paid" && (
+                            <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">
+                                <p>{t("trackPaymentConfirmedMessage")}</p>
+                            </div>
+                        )}
+
                         <div className="grid gap-2 text-sm sm:grid-cols-2">
+                            {(() => {
+                                const amounts = getOrderAmounts(order);
+                                return (
+                                    <>
+                                        <p className="text-emerald-50/80 sm:col-span-2">
+                                            <span className="text-emerald-100/60">{t("subtotal")}: </span>
+                                            {formatPrice(amounts.subtotal)}
+                                        </p>
+                                        {amounts.gstAmount > 0 && (
+                                            <p className="text-emerald-50/80 sm:col-span-2">
+                                                <span className="text-emerald-100/60">
+                                                    {t("gstAmount", { rate: amounts.gstRate })}:{" "}
+                                                </span>
+                                                {formatPrice(amounts.gstAmount)}
+                                            </p>
+                                        )}
+                                        <p className="text-emerald-50/80">
+                                            <span className="text-emerald-100/60">{t("totalAmount")}: </span>
+                                            <span className="font-semibold text-emerald-200">
+                                                {formatPrice(amounts.totalAmount)}
+                                            </span>
+                                        </p>
+                                    </>
+                                );
+                            })()}
                             <p className="text-emerald-50/80">
-                                <span className="text-emerald-100/60">{t("totalAmount")}: </span>
-                                <span className="font-semibold text-emerald-200">
-                                    {formatPrice(order.totalAmount)}
-                                </span>
+                                <span className="text-emerald-100/60">{t("paymentMethod")}: </span>
+                                {(() => {
+                                    const key = getPaymentLabelKey(order.paymentMethod);
+                                    return key ? t(key) : order.paymentMethod;
+                                })()}
                             </p>
+                            {order.paymentStatus && (
+                                <p className="text-emerald-50/80">
+                                    <span className="text-emerald-100/60">{t("paymentStatus")}: </span>
+                                    <span
+                                        className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${paymentStatusBadgeClass(
+                                            order.paymentStatus
+                                        )}`}
+                                    >
+                                        {t(getPaymentStatusLabelKey(order.paymentStatus))}
+                                    </span>
+                                </p>
+                            )}
                             <p className="text-emerald-50/80">
                                 <span className="text-emerald-100/60">{t("orderDate")}: </span>
                                 {formatDate(order.createdAt)}
                             </p>
                         </div>
+
+                        {routeToken && canViewInvoice(order.paymentStatus) && (
+                            <Link
+                                to={`/invoice/${routeToken}`}
+                                className="inline-flex text-sm font-medium text-emerald-300 transition hover:text-emerald-200"
+                            >
+                                {t("viewInvoice")} →
+                            </Link>
+                        )}
 
                         {order.items?.length > 0 && (
                             <div>
@@ -470,6 +637,37 @@ const TrackOrder = () => {
                                 <span className="text-emerald-100/60">{t("returnReason")}: </span>
                                 {order.returnReason}
                             </p>
+                        )}
+
+                        {(order.returnPhotos?.length > 0 || order.returnVideo) && (
+                            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                                <p className="text-sm font-medium text-emerald-50">{t("returnEvidenceTitle")}</p>
+                                {order.returnPhotos?.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {order.returnPhotos.map((url, index) => (
+                                            <a
+                                                key={url}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <img
+                                                    src={url}
+                                                    alt={t("returnEvidencePhotoAlt", { index: index + 1 })}
+                                                    className="h-20 w-20 rounded-lg object-cover transition hover:opacity-80"
+                                                />
+                                            </a>
+                                        ))}
+                                    </div>
+                                )}
+                                {order.returnVideo && (
+                                    <video
+                                        src={order.returnVideo}
+                                        controls
+                                        className="mt-3 max-h-48 w-full rounded-lg"
+                                    />
+                                )}
+                            </div>
                         )}
 
                         {(order.trackingId || order.trackingUrl) && (
@@ -511,6 +709,53 @@ const TrackOrder = () => {
                             </div>
                         )}
 
+                        {showReturnProgress && (
+                            <div>
+                                <p className="mb-3 text-sm font-medium text-emerald-50">
+                                    {t("returnProgressTitle")}
+                                </p>
+                                <ol className="flex flex-wrap gap-2">
+                                    {RETURN_PROGRESS_STAGES.map((stage) => {
+                                        const currentIndex = RETURN_PROGRESS_STAGES.indexOf(
+                                            normalizedReturnStatus
+                                        );
+                                        const stageIndex = RETURN_PROGRESS_STAGES.indexOf(stage);
+                                        const isComplete = stageIndex <= currentIndex;
+                                        const isCurrent = stage === normalizedReturnStatus;
+
+                                        return (
+                                            <li
+                                                key={stage}
+                                                className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                                                    isComplete
+                                                        ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100"
+                                                        : "border-white/10 bg-white/5 text-emerald-50/50"
+                                                } ${isCurrent ? "ring-1 ring-emerald-400/40" : ""}`}
+                                            >
+                                                {getReturnStatusLabel(stage)}
+                                            </li>
+                                        );
+                                    })}
+                                </ol>
+                            </div>
+                        )}
+
+                        {(order.returnTrackingId || order.returnCourier) && (
+                            <div className="rounded-xl border border-indigo-400/20 bg-indigo-500/10 px-4 py-3 text-sm">
+                                <p className="font-medium text-indigo-100">{t("returnTrackingTitle")}</p>
+                                {order.returnCourier && (
+                                    <p className="mt-1 text-indigo-50/80">
+                                        {t("returnCourier")}: {order.returnCourier}
+                                    </p>
+                                )}
+                                {order.returnTrackingId && (
+                                    <p className="mt-1 text-indigo-50/80">
+                                        {t("returnTrackingId")}: {order.returnTrackingId}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         {order.deliveryTimeline?.length > 0 && (
                             <div>
                                 <p className="mb-3 text-sm font-medium text-emerald-50">
@@ -539,10 +784,14 @@ const TrackOrder = () => {
                             </div>
                         )}
 
-                        {canRequestReturn && (
+                        {canRequestReturn(order) && (
                             <button
                                 type="button"
-                                onClick={() => setReturnOpen(true)}
+                                onClick={() => {
+                                    resetReturnEvidence();
+                                    setReturnReason("");
+                                    setReturnOpen(true);
+                                }}
                                 className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-5 py-2.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20"
                             >
                                 {t("requestReturn")}
@@ -556,7 +805,7 @@ const TrackOrder = () => {
                         <button
                             type="button"
                             aria-label={t("close")}
-                            onClick={() => setReturnOpen(false)}
+                            onClick={closeReturnModal}
                             className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
                         />
                         <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/15 bg-slate-900/95 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
@@ -576,6 +825,52 @@ const TrackOrder = () => {
                                         className={inputClassName}
                                     />
                                 </div>
+                                <div>
+                                    <label className={labelClassName} htmlFor="returnPhotos">
+                                        {t("returnEvidencePhotos")}
+                                    </label>
+                                    <p className="mb-2 text-xs text-emerald-50/60">{t("returnEvidenceOptional")}</p>
+                                    <input
+                                        id="returnPhotos"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        multiple
+                                        onChange={handleReturnPhotoSelect}
+                                        className="block w-full text-sm text-emerald-50/80 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                                    />
+                                    {photoPreviewUrls.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {photoPreviewUrls.map((url, index) => (
+                                                <img
+                                                    key={url}
+                                                    src={url}
+                                                    alt={t("returnEvidencePhotoAlt", { index: index + 1 })}
+                                                    className="h-20 w-20 rounded-lg object-cover"
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className={labelClassName} htmlFor="returnVideo">
+                                        {t("returnEvidenceVideo")}
+                                    </label>
+                                    <p className="mb-2 text-xs text-emerald-50/60">{t("returnEvidenceVideoHint")}</p>
+                                    <input
+                                        id="returnVideo"
+                                        type="file"
+                                        accept="video/mp4,video/quicktime"
+                                        onChange={handleReturnVideoSelect}
+                                        className="block w-full text-sm text-emerald-50/80 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                                    />
+                                    {videoPreviewUrl && (
+                                        <video
+                                            src={videoPreviewUrl}
+                                            controls
+                                            className="mt-3 max-h-40 w-full rounded-lg"
+                                        />
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap gap-3">
                                     <button
                                         type="submit"
@@ -586,7 +881,7 @@ const TrackOrder = () => {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setReturnOpen(false)}
+                                        onClick={closeReturnModal}
                                         className="rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
                                     >
                                         {t("cancel")}

@@ -1,5 +1,5 @@
 const Business = require("../models/Business");
-const { buildOrderTrackUrl } = require("../utils/orderTrackUrl");
+const { buildOrderTrackUrl, buildOrderPayUrl } = require("../utils/orderTrackUrl");
 
 const DEFAULT_API_VERSION = "v21.0";
 
@@ -98,11 +98,55 @@ const notifyOwnerNewOrder = async (order, businessId) => {
         }
 
         const orderId = shortOrderId(order);
-        const message = `New order #${orderId} from ${order.customerName} - ${formatAmount(order.totalAmount)}. Customer: ${order.customerPhone}. Check BizBuilder dashboard.`;
+        const amount = formatAmount(order.totalAmount);
+        const { isOnlinePaymentMethod } = require("../utils/paymentMethods");
+
+        const message = isOnlinePaymentMethod(order.paymentMethod)
+            ? `New order #${orderId} - ${amount} - awaiting online payment. Customer will pay via UPI. Confirm in dashboard once received.`
+            : `New order #${orderId} from ${order.customerName} - ${amount}. Customer: ${order.customerPhone}. Check BizBuilder dashboard.`;
 
         await sendWhatsAppMessage(business.phoneNumber, message);
     } catch (error) {
         console.error("[WhatsApp] Failed to notify owner:", error.message);
+    }
+};
+
+const notifyOwnerPaymentSubmitted = async (order, business) => {
+    try {
+        const ownerPhone = business?.phoneNumber;
+
+        if (!ownerPhone) {
+            console.warn("[WhatsApp] Business has no phone number, skipping payment submitted alert");
+            return;
+        }
+
+        const orderId = shortOrderId(order);
+        const amount = formatAmount(order.totalAmount);
+        const message = `New order #${orderId} - ${amount} - Customer initiated UPI payment. Please verify in your UPI app and confirm in dashboard.`;
+
+        await sendWhatsAppMessage(ownerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify owner (payment submitted):", error.message);
+    }
+};
+
+const notifyOwnerPaymentReceived = async (order, business) => {
+    try {
+        const ownerPhone = business?.phoneNumber;
+
+        if (!ownerPhone) {
+            console.warn("[WhatsApp] Business has no phone number, skipping paid order alert");
+            return;
+        }
+
+        const orderId = shortOrderId(order);
+        const amount = formatAmount(order.totalAmount);
+        const paymentRef = order.razorpayPaymentId ? ` Payment ID: ${order.razorpayPaymentId}.` : "";
+        const message = `Payment received for order #${orderId} - ${amount}.${paymentRef} Order is confirmed in BizBuilder.`;
+
+        await sendWhatsAppMessage(ownerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify owner (payment received):", error.message);
     }
 };
 
@@ -122,6 +166,26 @@ const notifyCustomerOrderConfirmed = async (order, business) => {
         await sendWhatsAppMessage(customerPhone, message);
     } catch (error) {
         console.error("[WhatsApp] Failed to notify customer (confirmed):", error.message);
+    }
+};
+
+const notifyCustomerPaymentConfirmed = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            console.warn("[WhatsApp] Order has no customer phone, skipping payment confirmed alert");
+            return;
+        }
+
+        const orderId = shortOrderId(order);
+        const trackUrl = buildOrderTrackUrl(order, business);
+        const trackLine = trackUrl ? ` Track: ${trackUrl}` : "";
+        const message = `Payment confirmed! Your order #${orderId} is confirmed.${trackLine}`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (payment confirmed):", error.message);
     }
 };
 
@@ -162,6 +226,27 @@ const notifyCustomerOrderPlaced = async (order, business) => {
         await sendWhatsAppMessage(customerPhone, message);
     } catch (error) {
         console.error("[WhatsApp] Failed to notify customer (placed):", error.message);
+    }
+};
+
+const notifyCustomerPaymentPending = async (order, business) => {
+    try {
+        const customerPhone = getCustomerWhatsAppNumber(order);
+
+        if (!customerPhone) {
+            console.warn("[WhatsApp] Order has no customer phone, skipping payment pending alert");
+            return;
+        }
+
+        const businessName = business?.businessName || "your seller";
+        const orderId = shortOrderId(order);
+        const payUrl = buildOrderPayUrl(order, business);
+        const payLine = payUrl ? `\n\nComplete payment: ${payUrl}` : "";
+        const message = `Your order #${orderId} from ${businessName} is awaiting payment. Please complete payment to confirm your order. Total: ${formatAmount(order.totalAmount)}.${payLine}`;
+
+        await sendWhatsAppMessage(customerPhone, message);
+    } catch (error) {
+        console.error("[WhatsApp] Failed to notify customer (payment pending):", error.message);
     }
 };
 
@@ -214,7 +299,7 @@ const notifyCustomerReturnApproved = async (order, business) => {
 
         const businessName = business?.businessName || "your seller";
         const orderId = shortOrderId(order);
-        const message = `Your return request for order #${orderId} from ${businessName} has been approved. Refund or pickup details will follow from the shop.`;
+        const message = `Your return request for order #${orderId} from ${businessName} has been accepted. Please ship the item back to the shop.`;
 
         await sendWhatsAppMessage(customerPhone, message);
     } catch (error) {
@@ -353,7 +438,11 @@ module.exports = {
     isConfigured,
     sendWhatsAppMessage,
     notifyOwnerNewOrder,
+    notifyOwnerPaymentSubmitted,
+    notifyOwnerPaymentReceived,
     notifyCustomerOrderPlaced,
+    notifyCustomerPaymentPending,
+    notifyCustomerPaymentConfirmed,
     notifyCustomerOrderConfirmed,
     notifyCustomerOrderPreparing,
     notifyCustomerOrderDelivered,

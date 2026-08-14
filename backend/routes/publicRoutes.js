@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 
-const { publicOrderValidation, trackOrderValidation, returnRequestValidation } = require("../validators/publicValidator");
+const { publicOrderValidation, trackOrderValidation, returnRequestValidation, verifyRazorpayPaymentValidation } = require("../validators/publicValidator");
 const { verifyDeliveryOtpValidation } = require("../validators/deliveryValidator");
 const deliveryUpload = require("../middleware/deliveryUpload");
+const returnUpload = require("../middleware/returnUpload");
 const {
     getPublicBusiness,
     getPublicProducts,
@@ -11,7 +12,12 @@ const {
     trackPublicOrderByToken,
     trackPublicOrderGlobal,
     trackPublicOrder,
-    requestPublicReturn
+    requestPublicReturn,
+    getPublicInvoiceByToken,
+    getPaymentPage,
+    confirmPayment,
+    createRazorpayOrderForPayment,
+    verifyRazorpayPayment
 } = require("../controllers/publicController");
 const {
     getDeliveryOrder,
@@ -20,6 +26,11 @@ const {
 } = require("../controllers/deliveryController");
 
 router.get("/orders/track/:token", trackPublicOrderByToken);
+router.get("/orders/invoice/:token", getPublicInvoiceByToken);
+router.get("/orders/pay/:token", getPaymentPage);
+router.post("/orders/pay/:token/confirm", confirmPayment);
+router.post("/orders/pay/:token/razorpay-order", createRazorpayOrderForPayment);
+router.post("/orders/pay/:token/verify", ...verifyRazorpayPaymentValidation, verifyRazorpayPayment);
 router.get("/orders/track", ...trackOrderValidation, trackPublicOrderGlobal);
 
 router.get("/deliver/:deliveryToken", getDeliveryOrder);
@@ -40,6 +51,10 @@ router.post("/businesses/:idOrSlug/orders", ...publicOrderValidation, createPubl
 router.get("/businesses/:idOrSlug/orders/track", ...trackOrderValidation, trackPublicOrder);
 router.post(
     "/businesses/:idOrSlug/orders/:orderId/return-request",
+    returnUpload.fields([
+        { name: "photos", maxCount: 5 },
+        { name: "video", maxCount: 1 }
+    ]),
     ...returnRequestValidation,
     requestPublicReturn
 );

@@ -51,3 +51,40 @@ export const statusBadgeClass = (status) => {
             return "bg-white/10 text-emerald-50 border-white/20";
     }
 };
+
+export const RETURN_PROGRESS_STAGES = ["Requested", "Accepted", "Shipped", "Delivered"];
+
+export const normalizeReturnStatus = (status) => {
+    if (!status || status === "None") {
+        return "None";
+    }
+    if (status === "Approved") {
+        return "Accepted";
+    }
+    if (status === "Completed") {
+        return "Delivered";
+    }
+    return status;
+};
+
+export const returnBadgeClass = (status) => {
+    switch (normalizeReturnStatus(status)) {
+        case "Requested":
+            return "bg-amber-500/20 text-amber-100 border-amber-400/30";
+        case "Accepted":
+            return "bg-emerald-500/20 text-emerald-100 border-emerald-400/30";
+        case "Shipped":
+            return "bg-indigo-500/20 text-indigo-100 border-indigo-400/30";
+        case "Delivered":
+            return "bg-teal-500/20 text-teal-100 border-teal-400/30";
+        case "Rejected":
+            return "bg-red-500/20 text-red-100 border-red-400/30";
+        default:
+            return "bg-white/10 text-emerald-50 border-white/20";
+    }
+};
+
+export const canRequestReturn = (order) =>
+    order &&
+    ["Delivered", "Completed"].includes(order.orderStatus) &&
+    (!order.returnStatus || order.returnStatus === "None");

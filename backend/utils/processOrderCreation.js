@@ -3,11 +3,19 @@ const Product = require("../models/Product");
 const Order = require("../models/Orders");
 const Business = require("../models/Business");
 const aggregateOrderProducts = require("./aggregateOrderProducts");
+const { calculateOrderAmounts } = require("./gstCalculation");
 const { decrementStock, restoreStock } = require("./orderInventory");
 const {
     notifyOwnerNewOrder,
-    notifyCustomerOrderPlaced
+    notifyCustomerOrderPlaced,
+    notifyCustomerOrderConfirmed,
+    notifyCustomerPaymentPending
 } = require("../services/whatsappService");
+const {
+    getInitialPaymentStatus,
+    isOnlinePaymentMethod,
+    isCodPaymentMethod
+} = require("./paymentMethods");
 
 const generateTrackingToken = () => crypto.randomBytes(32).toString("hex");
 
@@ -45,7 +53,7 @@ const buildOrderFromProducts = async (businessId, products) => {
         });
     }
 
-    return { aggregatedProducts, orderProducts, totalAmount };
+    return { aggregatedProducts, orderProducts, subtotal: totalAmount };
 };
 
 const createOrderForBusiness = async ({
@@ -58,10 +66,15 @@ const createOrderForBusiness = async ({
     isWhatsAppSameAsPhone = true,
     customerWhatsApp
 }) => {
-    const { aggregatedProducts, orderProducts, totalAmount } = await buildOrderFromProducts(
+    const { aggregatedProducts, orderProducts, subtotal } = await buildOrderFromProducts(
         businessId,
         products
     );
+
+    const business = await Business.findById(businessId).select(
+        "businessName slug gstEnabled gstRate"
+    );
+    const { gstAmount, gstRate, totalAmount } = calculateOrderAmounts(subtotal, business);
 
     const resolvedWhatsApp = isWhatsAppSameAsPhone ? customerPhone : customerWhatsApp;
 
@@ -78,15 +91,25 @@ const createOrderForBusiness = async ({
             isWhatsAppSameAsPhone,
             customerWhatsApp: resolvedWhatsApp,
             products: orderProducts,
+            subtotal,
+            gstAmount,
+            gstRate,
             totalAmount,
             paymentMethod,
+            paymentStatus: getInitialPaymentStatus(paymentMethod),
             trackingToken: generateTrackingToken()
         });
 
-        const business = await Business.findById(businessId).select("businessName slug");
-
         notifyOwnerNewOrder(order, businessId);
-        notifyCustomerOrderPlaced(order, business);
+
+        if (isCodPaymentMethod(paymentMethod)) {
+            notifyCustomerOrderPlaced(order, business);
+            notifyCustomerOrderConfirmed(order, business);
+        } else if (isOnlinePaymentMethod(paymentMethod)) {
+            notifyCustomerPaymentPending(order, business);
+        } else {
+            notifyCustomerOrderPlaced(order, business);
+        }
 
         return order;
     } catch (error) {

@@ -20,7 +20,24 @@ const buildOrderTrackUrl = (order, business) => {
     return `${base}/track/${token}`;
 };
 
+const buildOrderPayUrl = (order, business) => {
+    const base = getFrontendBaseUrl();
+    const token = order.trackingToken;
+
+    if (!token) {
+        return null;
+    }
+
+    const slug = business?.slug;
+    if (slug) {
+        return `${base}/store/${slug}/pay/${token}`;
+    }
+
+    return `${base}/pay/${token}`;
+};
+
 module.exports = {
     getFrontendBaseUrl,
-    buildOrderTrackUrl
+    buildOrderTrackUrl,
+    buildOrderPayUrl
 };

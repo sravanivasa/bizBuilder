@@ -9,6 +9,8 @@ const { TERMINAL_ORDER_STATUSES } = require("../utils/orderStatus");
 const { buildCourierTrackingUrl } = require("../utils/courierTracking");
 const { buildDeliveryPersonUrl } = require("../utils/deliveryUrl");
 const { appendDeliveryTimeline } = require("../utils/deliveryTimeline");
+const { buildInvoiceResponse } = require("../utils/invoiceBuilder");
+const { normalizeReturnStatus } = require("../utils/returnStatus");
 const { generateDeliveryOtp, getDeliveryOtpExpiry } = require("../utils/deliveryOtp");
 const {
     notifyCustomerOrderConfirmed,
@@ -21,7 +23,8 @@ const {
     notifyCustomerOutForDelivery,
     notifyCustomerDeliveryOtp,
     notifyDeliveryPersonLink,
-    notifyCustomerCourierTracking
+    notifyCustomerCourierTracking,
+    notifyCustomerPaymentConfirmed
 } = require("../services/whatsappService");
 
 const DELETABLE_ORDER_STATUSES = ["Pending", "New", "Cancelled"];
@@ -398,25 +401,75 @@ const updateReturnStatus = asyncHandler(async (req, res) => {
         });
     }
 
-    if (order.returnStatus !== "Requested") {
+    const { returnStatus, returnTrackingId, returnCourier } = req.body;
+    const currentReturnStatus = normalizeReturnStatus(order.returnStatus);
+
+    if (returnStatus === "Delivered") {
+        if (!["Shipped", "Accepted"].includes(currentReturnStatus)) {
+            return res.status(400).json({
+                success: false,
+                message: "Return must be accepted or shipped before marking as received"
+            });
+        }
+
+        await restoreStock(order.products);
+        order.returnStatus = "Delivered";
+        order.returnDeliveredAt = new Date();
+        order.returnResolvedAt = new Date();
+        await order.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Return marked as received and stock restored",
+            order
+        });
+    }
+
+    if (returnStatus === "Shipped") {
+        if (currentReturnStatus !== "Accepted") {
+            return res.status(400).json({
+                success: false,
+                message: "Return must be accepted before marking as shipped"
+            });
+        }
+
+        order.returnStatus = "Shipped";
+        order.returnShippedAt = new Date();
+        if (returnTrackingId?.trim()) {
+            order.returnTrackingId = returnTrackingId.trim();
+        }
+        if (returnCourier?.trim()) {
+            order.returnCourier = returnCourier.trim();
+        }
+        await order.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Return marked as shipped",
+            order
+        });
+    }
+
+    if (currentReturnStatus !== "Requested") {
         return res.status(400).json({
             success: false,
             message: "No pending return request for this order"
         });
     }
 
-    const { returnStatus } = req.body;
-
-    if (returnStatus === "Approved") {
-        await restoreStock(order.products);
-        order.returnStatus = "Completed";
-        order.returnResolvedAt = new Date();
+    if (returnStatus === "Approved" || returnStatus === "Accepted") {
+        order.returnStatus = "Accepted";
         await order.save();
         notifyCustomerReturnApproved(order, business);
     } else if (returnStatus === "Rejected") {
         order.returnStatus = "Rejected";
         order.returnResolvedAt = new Date();
         await order.save();
+    } else {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid return status transition"
+        });
     }
 
     res.status(200).json({
@@ -592,6 +645,77 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
     });
 });
 
+const getOrderInvoice = asyncHandler(async (req, res) => {
+    const { error } = await ensureOwnerOrder(req.params.id, req.user._id);
+
+    if (error) {
+        return res.status(error.status).json({
+            success: false,
+            message: error.message
+        });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    const invoice = await buildInvoiceResponse(order);
+
+    res.status(200).json({
+        success: true,
+        message: "Invoice fetched successfully",
+        invoice
+    });
+});
+
+const updatePaymentStatus = asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: errors.array()
+        });
+    }
+
+    const { error } = await ensureOwnerOrder(req.params.id, req.user._id);
+
+    if (error) {
+        return res.status(error.status).json({
+            success: false,
+            message: error.message
+        });
+    }
+
+    const order = await Order.findById(req.params.id);
+    const { paymentStatus } = req.body;
+    const previousPaymentStatus = order.paymentStatus;
+
+    order.paymentStatus = paymentStatus;
+
+    if (paymentStatus === "Paid" && previousPaymentStatus !== "Paid") {
+        const business = await Business.findById(order.business);
+
+        if (order.orderStatus === "Pending" || order.orderStatus === "New") {
+            order.orderStatus = "Confirmed";
+            appendDeliveryTimeline(order, {
+                status: "Confirmed",
+                note: "Payment verified by owner"
+            });
+        }
+
+        notifyCustomerPaymentConfirmed(order, business);
+    }
+
+    await order.save();
+
+    const responseOrder = attachDeliveryPersonUrl(order);
+
+    res.status(200).json({
+        success: true,
+        message: "Payment status updated successfully",
+        order: responseOrder
+    });
+});
+
 module.exports = {
     createOrder,
     getMyOrders,
@@ -600,5 +724,7 @@ module.exports = {
     bulkUpdateOrderStatus,
     updateReturnStatus,
     deleteOrder,
-    updateOrderDelivery
+    updateOrderDelivery,
+    getOrderInvoice,
+    updatePaymentStatus
 };

@@ -96,10 +96,14 @@ export const saveCustomerOrder = (order) => {
             order.shortOrderId || String(orderId).slice(-6).toUpperCase(),
         trackingToken: order.trackingToken || "",
         phone: order.phone || order.customerPhone,
+        customerName: order.customerName || "",
+        customerAddress: order.customerAddress || "",
         businessName: order.businessName || "",
         totalAmount: order.totalAmount,
         createdAt: order.createdAt || new Date().toISOString(),
-        orderStatus: order.orderStatus || "Pending"
+        orderStatus: order.orderStatus || "Pending",
+        paymentStatus: order.paymentStatus || "",
+        paymentMethod: order.paymentMethod || ""
     };
 
     if (entry.businessId && entry.phone) {
@@ -108,6 +112,22 @@ export const saveCustomerOrder = (order) => {
 
     const orders = readOrders().filter((item) => item.orderId !== entry.orderId);
     writeOrders([entry, ...orders]);
+};
+
+export const getLastCheckoutDetails = (storeKey, businessId) => {
+    const orders = getCustomerOrders(storeKey);
+    const order = orders[0];
+
+    if (!order) {
+        const phone = businessId ? getLastPhone(businessId) : "";
+        return phone ? { customerName: "", customerPhone: phone, customerAddress: "" } : null;
+    }
+
+    return {
+        customerName: order.customerName || "",
+        customerPhone: order.phone || getLastPhone(order.businessId) || "",
+        customerAddress: order.customerAddress || ""
+    };
 };
 
 export const getCustomerOrders = (storeKey) => {

@@ -21,8 +21,29 @@ export const trackPublicOrderGlobal = ({ orderId, phone }) =>
 export const trackPublicOrderByToken = (token) =>
     publicApi.get(`/public/orders/track/${token}`);
 
-export const requestPublicReturn = (businessId, orderId, payload) =>
-    publicApi.post(`/public/businesses/${businessId}/orders/${orderId}/return-request`, payload);
+export const getPublicInvoiceByToken = (token) =>
+    publicApi.get(`/public/orders/invoice/${token}`);
+
+export const getPaymentPage = (token) => publicApi.get(`/public/orders/pay/${token}`);
+
+export const confirmPayment = (token) =>
+    publicApi.post(`/public/orders/pay/${token}/confirm`);
+
+export const createRazorpayOrder = (token) =>
+    publicApi.post(`/public/orders/pay/${token}/razorpay-order`);
+
+export const verifyRazorpayPayment = (token, payload) =>
+    publicApi.post(`/public/orders/pay/${token}/verify`, payload);
+
+export const requestPublicReturn = (businessId, orderId, payload) => {
+    const isFormData = payload instanceof FormData;
+
+    return publicApi.post(
+        `/public/businesses/${businessId}/orders/${orderId}/return-request`,
+        payload,
+        isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
+    );
+};
 
 export const getDeliveryOrder = (deliveryToken) =>
     publicApi.get(`/public/deliver/${deliveryToken}`);
