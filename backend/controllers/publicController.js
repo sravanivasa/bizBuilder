@@ -505,6 +505,39 @@ const PAYMENT_BUSINESS_FIELDS = [
     "autoConfirmOnlinePayments"
 ];
 
+const PAYMENT_PAGE_BUSINESS_BASE_FIELDS = ["_id", "businessName", "slug"];
+
+const PAYMENT_PAGE_NETBANKING_FIELDS = [
+    "bankAccountName",
+    "bankName",
+    "bankAccountNumber",
+    "bankIfsc"
+];
+
+const UPI_PAYMENT_METHODS = ["GPay", "PhonePe", "UPI"];
+
+const buildPaymentPageBusiness = (business, order, { razorpayConfigured }) => {
+    if (!business) {
+        return { businessName: "Shop" };
+    }
+
+    const plain = business.toObject();
+    const response = pickFields(plain, PAYMENT_PAGE_BUSINESS_BASE_FIELDS);
+    const isManualFallback = !razorpayConfigured;
+    const isNetBanking = order.paymentMethod === "NetBanking";
+    const isUpiMethod = UPI_PAYMENT_METHODS.includes(order.paymentMethod);
+
+    if (isManualFallback && isNetBanking) {
+        Object.assign(response, pickFields(plain, PAYMENT_PAGE_NETBANKING_FIELDS));
+    }
+
+    if (isManualFallback && isUpiMethod && plain.upiId) {
+        response.upiId = plain.upiId;
+    }
+
+    return response;
+};
+
 const getPaymentPage = asyncHandler(async (req, res) => {
     const { token } = req.params;
 
@@ -537,15 +570,20 @@ const getPaymentPage = asyncHandler(async (req, res) => {
 
     const razorpayConfigured = isRazorpayConfigured(business);
     const razorpayCredentials = getRazorpayCredentials(business);
+    const isNetBanking = order.paymentMethod === "NetBanking";
+    const isUpiMethod = UPI_PAYMENT_METHODS.includes(order.paymentMethod);
+    const shouldExposeUpiArtifacts =
+        Boolean(business?.upiId && order.totalAmount) &&
+        !isNetBanking &&
+        (isUpiMethod || razorpayConfigured);
 
-    const upiLink =
-        business?.upiId && order.totalAmount
-            ? buildUpiPayLink({
-                  upiId: business.upiId,
-                  businessName: business.businessName,
-                  amount: order.totalAmount
-              })
-            : null;
+    const upiLink = shouldExposeUpiArtifacts
+        ? buildUpiPayLink({
+              upiId: business.upiId,
+              businessName: business.businessName,
+              amount: order.totalAmount
+          })
+        : null;
 
     res.status(200).json({
         success: true,
@@ -553,7 +591,6 @@ const getPaymentPage = asyncHandler(async (req, res) => {
         payment: {
             orderId: order._id,
             shortOrderId: shortOrderId(order._id),
-            trackingToken: order.trackingToken,
             paymentMethod: order.paymentMethod,
             paymentStatus: order.paymentStatus,
             paymentSubmittedAt: order.paymentSubmittedAt || null,
@@ -566,9 +603,7 @@ const getPaymentPage = asyncHandler(async (req, res) => {
             razorpayConfigured,
             razorpayKeyId: razorpayCredentials?.keyId || null,
             upiLink,
-            business: business
-                ? pickFields(business.toObject(), PAYMENT_BUSINESS_FIELDS)
-                : { businessName: "Shop" },
+            business: buildPaymentPageBusiness(business, order, { razorpayConfigured }),
             appPayLink: upiLink ? buildAppPayLink(order.paymentMethod, upiLink) : null,
             qrCodeUrl: upiLink
                 ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`

@@ -174,8 +174,11 @@ const Payment = () => {
     const isUpiMethod = payment && ["GPay", "PhonePe", "UPI"].includes(payment.paymentMethod);
     const isNetBanking = payment?.paymentMethod === "NetBanking";
     const business = payment?.business;
-    const hasUpiDetails = Boolean(business?.upiId);
+    const hasUpiDetails = Boolean(
+        payment?.upiLink || payment?.qrCodeUrl || payment?.appPayLink
+    );
     const hasBankDetails =
+        payment?.paymentMethod === "NetBanking" &&
         Boolean(business?.bankAccountNumber) &&
         Boolean(business?.bankName) &&
         Boolean(business?.bankIfsc);
@@ -346,9 +349,11 @@ const Payment = () => {
                                                 alt={t("paymentQrAlt")}
                                                 className="h-44 w-44 rounded-2xl border border-white/10 bg-white p-2"
                                             />
-                                            <p className="font-mono text-xs text-emerald-100">
-                                                {business.upiId}
-                                            </p>
+                                            {business?.upiId && (
+                                                <p className="font-mono text-xs text-emerald-100">
+                                                    {business.upiId}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}

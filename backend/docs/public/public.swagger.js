@@ -170,7 +170,12 @@
  *         schema: { type: string }
  *     responses:
  *       200:
- *         description: Payment page loaded
+ *         description: >-
+ *           Payment page loaded. The nested business object is method-scoped:
+ *           base fields (_id, businessName, slug) always; bank fields only for
+ *           manual NetBanking; upiId only for manual UPI when Razorpay is not
+ *           configured. trackingToken, phoneNumber, and autoConfirmOnlinePayments
+ *           are never returned.
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       404: { $ref: '#/components/responses/NotFound' }
  * /api/public/orders/pay/{token}/razorpay-order:
