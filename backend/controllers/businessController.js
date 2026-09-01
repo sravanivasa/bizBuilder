@@ -100,6 +100,13 @@ const getBusinessById = asyncHandler(async (req, res) => {
         });
     }
 
+    if (business.owner.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+            success: false,
+            message: "Forbidden"
+        });
+    }
+
     res.status(200).json({
         success: true,
         message: "Business fetched successfully",

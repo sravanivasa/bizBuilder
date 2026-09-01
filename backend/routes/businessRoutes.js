@@ -19,7 +19,7 @@ const {
 
 router.post("/", authMiddleware, ...createBusinessValidation, createBusiness);
 router.get("/my-businesses", authMiddleware, getMyBusinesses);
-router.get("/:id", validateObjectId("id"), getBusinessById);
+router.get("/:id", authMiddleware, validateObjectId("id"), getBusinessById);
 router.put(
     "/:id",
     authMiddleware,

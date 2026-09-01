@@ -39,11 +39,14 @@
  *   get:
  *     summary: Get business by ID
  *     tags: [Business]
+ *     security: [{ bearerAuth: [] }]
  *     parameters: [{ $ref: '#/components/parameters/BusinessEntityId' }]
  *     responses:
  *       200:
  *         description: Business fetched successfully
  *         content: { application/json: { schema: { $ref: '#/components/schemas/BusinessResponse' } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *   put:
  *     summary: Update business
