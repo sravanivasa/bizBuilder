@@ -31,10 +31,8 @@ const {
     notifyCustomerOrderDelivered,
     notifyCustomerOrderCancelled,
     notifyCustomerReturnApproved,
-    notifyOwnerPaymentSubmitted,
-    notifyCustomerPaymentConfirmed
+    notifyOwnerPaymentSubmitted
 } = require("../services/whatsappService");
-const { appendDeliveryTimeline } = require("../utils/deliveryTimeline");
 
 const PUBLIC_BUSINESS_FIELDS = [
     "businessName",
@@ -653,29 +651,6 @@ const confirmPayment = asyncHandler(async (req, res) => {
 
     const now = new Date();
     order.paymentSubmittedAt = now;
-
-    if (business?.autoConfirmOnlinePayments) {
-        order.paymentStatus = "Paid";
-
-        if (order.orderStatus === "Pending" || order.orderStatus === "New") {
-            order.orderStatus = "Confirmed";
-            appendDeliveryTimeline(order, {
-                status: "Confirmed",
-                note: "Payment auto-confirmed"
-            });
-        }
-
-        await order.save();
-        notifyCustomerPaymentConfirmed(order, business);
-
-        return res.status(200).json({
-            success: true,
-            message: "Payment confirmed",
-            paymentStatus: order.paymentStatus,
-            paymentSubmittedAt: order.paymentSubmittedAt
-        });
-    }
-
     order.paymentStatus = "PaymentSubmitted";
     await order.save();
 
