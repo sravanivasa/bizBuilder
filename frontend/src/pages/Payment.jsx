@@ -61,11 +61,13 @@ const Payment = () => {
 
     const isPaid = payment?.paymentStatus === "Paid";
     const isSubmitted = payment?.paymentStatus === "PaymentSubmitted";
+    const isCancelled = payment?.orderStatus === "Cancelled";
+    const paymentAvailable = Boolean(payment?.paymentAvailable);
     const useRazorpay = Boolean(payment?.razorpayConfigured);
-    const showManualFallback = payment && !useRazorpay && !isPaid;
+    const showManualFallback = payment && paymentAvailable && !useRazorpay && !isPaid;
 
     const prepareRazorpayOrder = useCallback(async () => {
-        if (!payment || isPaid || !useRazorpay) {
+        if (!payment || isPaid || !useRazorpay || !paymentAvailable) {
             return null;
         }
 
@@ -81,7 +83,7 @@ const Payment = () => {
         } finally {
             setRazorpayLoading(false);
         }
-    }, [payment, isPaid, useRazorpay, token, t]);
+    }, [payment, isPaid, useRazorpay, paymentAvailable, token, t]);
 
     const openRazorpayCheckout = async () => {
         if (checkoutOpen) {
@@ -184,7 +186,7 @@ const Payment = () => {
         Boolean(business?.bankIfsc);
 
     const isMobile = isMobileDevice();
-    const showPaymentInstructions = payment && !isPaid && !isSubmitted;
+    const showPaymentInstructions = payment && paymentAvailable && !isPaid && !isSubmitted;
     const showDirectUpiPay =
         showPaymentInstructions &&
         isUpiMethod &&
@@ -196,17 +198,24 @@ const Payment = () => {
     const showUpiQrOnRazorpay =
         showRazorpayCheckout && hasUpiDetails && Boolean(payment.qrCodeUrl);
     const showInvoice = payment && canViewInvoice(payment.paymentStatus);
-    const headerIcon = isPaid ? "✓" : isSubmitted ? "⏳" : "💳";
-    const headerTitle = isPaid
-        ? t("orderConfirmedTitle")
-        : isSubmitted
-          ? t("paymentSubmittedTitle")
-          : t("completePaymentTitle");
-    const headerMessage = isPaid
-        ? t("paymentConfirmed", { id: payment?.shortOrderId })
-        : isSubmitted
-          ? t("paymentSubmittedMessage", { id: payment?.shortOrderId })
-          : t("completePaymentMessage", { id: payment?.shortOrderId });
+    const headerIcon = isCancelled ? "⚠️" : isPaid ? "✓" : isSubmitted ? "⏳" : "💳";
+    const headerTitle = isCancelled
+        ? t("orderStatusCancelled")
+        : isPaid
+          ? t("orderConfirmedTitle")
+          : isSubmitted
+            ? t("paymentSubmittedTitle")
+            : t("completePaymentTitle");
+    const headerMessage = isCancelled
+        ? t("paymentCancelledUnavailable", {
+              defaultValue:
+                  "This order has been cancelled. Payment is no longer available for this order."
+          })
+        : isPaid
+          ? t("paymentConfirmed", { id: payment?.shortOrderId })
+          : isSubmitted
+            ? t("paymentSubmittedMessage", { id: payment?.shortOrderId })
+            : t("completePaymentMessage", { id: payment?.shortOrderId });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900">
@@ -294,6 +303,15 @@ const Payment = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {isCancelled && (
+                            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                                {t("paymentCancelledUnavailable", {
+                                    defaultValue:
+                                        "This order has been cancelled. Payment is no longer available for this order."
+                                })}
+                            </div>
+                        )}
 
                         {isPaid && (
                             <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">

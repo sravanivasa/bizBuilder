@@ -11,16 +11,16 @@ const { resolveBusiness } = require("../utils/resolveBusiness");
 const { buildOrderTrackUrl, buildOrderPayUrl } = require("../utils/orderTrackUrl");
 const {
     findOrderByTrackingToken,
-    getCancelledOrderPaymentError,
-    getOnlinePaymentMethodError
+    isPaymentAvailable,
+    assertPublicCapability,
+    PUBLIC_CAPABILITIES
 } = require("../utils/publicOrderCapability");
 const { buildInvoiceResponse } = require("../utils/invoiceBuilder");
 const { normalizeReturnStatus } = require("../utils/returnStatus");
 const {
     isOnlinePaymentMethod,
     buildUpiPayLink,
-    buildAppPayLink,
-    isInvoiceAvailable
+    buildAppPayLink
 } = require("../utils/paymentMethods");
 const {
     isRazorpayConfigured,
@@ -480,11 +480,12 @@ const getPublicInvoiceByToken = asyncHandler(async (req, res) => {
     }
 
     const order = lookup.order;
+    const invoiceError = assertPublicCapability(order, PUBLIC_CAPABILITIES.INVOICE);
 
-    if (!isInvoiceAvailable(order)) {
-        return res.status(403).json({
+    if (invoiceError) {
+        return res.status(invoiceError.status).json({
             success: false,
-            message: "Invoice available after payment is confirmed"
+            message: invoiceError.message
         });
     }
 
@@ -555,14 +556,16 @@ const getPaymentPage = asyncHandler(async (req, res) => {
     }
 
     const order = lookup.order;
-    const paymentMethodError = getOnlinePaymentMethodError(order);
+    const payCapabilityError = assertPublicCapability(order, PUBLIC_CAPABILITIES.PAY);
 
-    if (paymentMethodError) {
-        return res.status(paymentMethodError.status).json({
+    if (payCapabilityError) {
+        return res.status(payCapabilityError.status).json({
             success: false,
-            message: paymentMethodError.message
+            message: payCapabilityError.message
         });
     }
+
+    const paymentAvailable = isPaymentAvailable(order);
 
     const business = await Business.findById(order.business)
         .select(`${PAYMENT_BUSINESS_FIELDS.join(" ")} razorpayEnabled razorpayKeyId`)
@@ -573,6 +576,7 @@ const getPaymentPage = asyncHandler(async (req, res) => {
     const isNetBanking = order.paymentMethod === "NetBanking";
     const isUpiMethod = UPI_PAYMENT_METHODS.includes(order.paymentMethod);
     const shouldExposeUpiArtifacts =
+        paymentAvailable &&
         Boolean(business?.upiId && order.totalAmount) &&
         !isNetBanking &&
         (isUpiMethod || razorpayConfigured);
@@ -591,8 +595,10 @@ const getPaymentPage = asyncHandler(async (req, res) => {
         payment: {
             orderId: order._id,
             shortOrderId: shortOrderId(order._id),
+            orderStatus: order.orderStatus,
             paymentMethod: order.paymentMethod,
             paymentStatus: order.paymentStatus,
+            paymentAvailable,
             paymentSubmittedAt: order.paymentSubmittedAt || null,
             totalAmount: order.totalAmount,
             subtotal: order.subtotal != null ? order.subtotal : order.totalAmount,
@@ -600,8 +606,8 @@ const getPaymentPage = asyncHandler(async (req, res) => {
             gstRate: order.gstRate || 0,
             customerName: order.customerName,
             customerPhone: order.customerPhone,
-            razorpayConfigured,
-            razorpayKeyId: razorpayCredentials?.keyId || null,
+            razorpayConfigured: paymentAvailable && razorpayConfigured,
+            razorpayKeyId: paymentAvailable && razorpayCredentials?.keyId ? razorpayCredentials.keyId : null,
             upiLink,
             business: buildPaymentPageBusiness(business, order, { razorpayConfigured }),
             appPayLink: upiLink ? buildAppPayLink(order.paymentMethod, upiLink) : null,
@@ -624,21 +630,12 @@ const confirmPayment = asyncHandler(async (req, res) => {
     }
 
     const order = lookup.order;
-    const cancelledError = getCancelledOrderPaymentError(order);
+    const mutateError = assertPublicCapability(order, PUBLIC_CAPABILITIES.PAY_MUTATE);
 
-    if (cancelledError) {
-        return res.status(cancelledError.status).json({
+    if (mutateError) {
+        return res.status(mutateError.status).json({
             success: false,
-            message: cancelledError.message
-        });
-    }
-
-    const paymentMethodError = getOnlinePaymentMethodError(order);
-
-    if (paymentMethodError) {
-        return res.status(paymentMethodError.status).json({
-            success: false,
-            message: paymentMethodError.message
+            message: mutateError.message
         });
     }
 
@@ -682,21 +679,12 @@ const createRazorpayOrderForPayment = asyncHandler(async (req, res) => {
     }
 
     const order = lookup.order;
-    const cancelledError = getCancelledOrderPaymentError(order);
+    const mutateError = assertPublicCapability(order, PUBLIC_CAPABILITIES.PAY_MUTATE);
 
-    if (cancelledError) {
-        return res.status(cancelledError.status).json({
+    if (mutateError) {
+        return res.status(mutateError.status).json({
             success: false,
-            message: cancelledError.message
-        });
-    }
-
-    const paymentMethodError = getOnlinePaymentMethodError(order);
-
-    if (paymentMethodError) {
-        return res.status(paymentMethodError.status).json({
-            success: false,
-            message: paymentMethodError.message
+            message: mutateError.message
         });
     }
 
@@ -776,12 +764,12 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
     }
 
     const order = lookup.order;
-    const paymentMethodError = getOnlinePaymentMethodError(order);
+    const mutateError = assertPublicCapability(order, PUBLIC_CAPABILITIES.PAY_MUTATE);
 
-    if (paymentMethodError) {
-        return res.status(paymentMethodError.status).json({
+    if (mutateError) {
+        return res.status(mutateError.status).json({
             success: false,
-            message: paymentMethodError.message
+            message: mutateError.message
         });
     }
 
@@ -796,15 +784,6 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
                 razorpayPaymentId: order.razorpayPaymentId || null,
                 paidAt: order.paidAt || null
             }
-        });
-    }
-
-    const cancelledError = getCancelledOrderPaymentError(order);
-
-    if (cancelledError) {
-        return res.status(cancelledError.status).json({
-            success: false,
-            message: cancelledError.message
         });
     }
 
