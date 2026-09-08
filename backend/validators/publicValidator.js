@@ -1,22 +1,10 @@
 const { body, query } = require("express-validator");
 const { PAYMENT_METHODS } = require("../utils/paymentMethods");
+const { isValidIndianPhone } = require("../utils/phoneValidation");
 
 const CUSTOMER_NAME_MIN = 2;
 const CUSTOMER_NAME_MAX = 100;
 const ADDRESS_MIN = 10;
-
-const normalizeIndianPhone = (value) => value.replace(/[\s-]/g, "");
-
-const isValidIndianPhone = (value) => {
-    const cleaned = normalizeIndianPhone(value);
-    if (/^\+91[6-9]\d{9}$/.test(cleaned)) {
-        return true;
-    }
-    if (/^91[6-9]\d{9}$/.test(cleaned)) {
-        return true;
-    }
-    return /^[6-9]\d{9}$/.test(cleaned);
-};
 
 const indianPhoneValidation = (fieldName, requiredMessage, location = "body") =>
     (location === "query" ? query(fieldName) : body(fieldName))

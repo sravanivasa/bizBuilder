@@ -9,6 +9,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import BusinessSetup from "./pages/BusinessSetup";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
+import Customers from "./pages/Customers";
 import Storefront from "./pages/Storefront";
 import TrackOrder from "./pages/TrackOrder";
 import DeliverOrder from "./pages/DeliverOrder";
@@ -48,6 +49,7 @@ const App = () => {
                         <Route path="/business" element={<BusinessSetup />} />
                         <Route path="/products" element={<Products />} />
                         <Route path="/orders" element={<Orders />} />
+                        <Route path="/customers" element={<Customers />} />
                         <Route path="/orders/:orderId/invoice" element={<Invoice ownerMode />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>

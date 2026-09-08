@@ -16,6 +16,7 @@ const {
     isOnlinePaymentMethod,
     isCodPaymentMethod
 } = require("./paymentMethods");
+const { findOrCreateCustomerForOrder } = require("./customerAssociation");
 
 const generateTrackingToken = () => crypto.randomBytes(32).toString("hex");
 
@@ -66,12 +67,13 @@ const createOrderForBusiness = async ({
     isWhatsAppSameAsPhone = true,
     customerWhatsApp
 }) => {
+    const normalizedBusinessId = String(businessId);
     const { aggregatedProducts, orderProducts, subtotal } = await buildOrderFromProducts(
-        businessId,
+        normalizedBusinessId,
         products
     );
 
-    const business = await Business.findById(businessId).select(
+    const business = await Business.findById(normalizedBusinessId).select(
         "businessName slug gstEnabled gstRate"
     );
     const { gstAmount, gstRate, totalAmount } = calculateOrderAmounts(subtotal, business);
@@ -83,8 +85,16 @@ const createOrderForBusiness = async ({
     try {
         decrementedItems = await decrementStock(aggregatedProducts);
 
+        const customer = await findOrCreateCustomerForOrder({
+            businessId: normalizedBusinessId,
+            customerName,
+            customerPhone,
+            customerAddress
+        });
+
         const order = await Order.create({
-            business: businessId,
+            business: normalizedBusinessId,
+            customer: customer._id,
             customerName,
             customerPhone,
             customerAddress,
@@ -100,7 +110,7 @@ const createOrderForBusiness = async ({
             trackingToken: generateTrackingToken()
         });
 
-        notifyOwnerNewOrder(order, businessId);
+        notifyOwnerNewOrder(order, normalizedBusinessId);
 
         if (isCodPaymentMethod(paymentMethod)) {
             notifyCustomerOrderPlaced(order, business);

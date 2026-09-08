@@ -2,6 +2,7 @@ const { body } = require("express-validator");
 const { ALL_ORDER_STATUSES } = require("../utils/orderStatus");
 const { COURIER_OPTIONS } = require("../utils/courierTracking");
 const { PAYMENT_METHODS, PAYMENT_STATUSES } = require("../utils/paymentMethods");
+const { isValidIndianPhone } = require("../utils/phoneValidation");
 
 const createOrderValidation = [
     body("businessId")
@@ -16,7 +17,14 @@ const createOrderValidation = [
     body("customerPhone")
         .trim()
         .notEmpty()
-        .withMessage("Customer phone is required"),
+        .withMessage("Customer phone is required")
+        .custom((value) => {
+            if (!isValidIndianPhone(value)) {
+                throw new Error("Enter a valid 10-digit Indian mobile number");
+            }
+
+            return true;
+        }),
 
     body("customerAddress")
         .trim()

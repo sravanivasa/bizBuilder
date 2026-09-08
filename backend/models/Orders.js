@@ -8,6 +8,12 @@ const orderSchema = new mongoose.Schema(
             required: true
         },
 
+        customer: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Customer",
+            default: null
+        },
+
         customerName: {
             type: String,
             required: true,
@@ -262,5 +268,6 @@ const orderSchema = new mongoose.Schema(
 );
 
 orderSchema.index({ business: 1, createdAt: -1 });
+orderSchema.index({ business: 1, customer: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Order", orderSchema);

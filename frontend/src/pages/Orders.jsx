@@ -1076,7 +1076,16 @@ const Orders = () => {
                         <div className="grid gap-2 text-sm sm:grid-cols-2">
                             <p className="text-emerald-50/80">
                                 <span className="text-emerald-100/60">{t("customerName")}: </span>
-                                {order.customerName}
+                                {order.customer ? (
+                                    <Link
+                                        to="/customers"
+                                        className="text-emerald-300 underline-offset-2 hover:underline"
+                                    >
+                                        {order.customerName}
+                                    </Link>
+                                ) : (
+                                    order.customerName
+                                )}
                             </p>
                             <p className="text-emerald-50/80">
                                 <span className="text-emerald-100/60">{t("customerPhone")}: </span>
