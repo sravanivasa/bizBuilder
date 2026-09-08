@@ -11,7 +11,8 @@ const { buildDeliveryPersonUrl } = require("../utils/deliveryUrl");
 const { appendDeliveryTimeline } = require("../utils/deliveryTimeline");
 const { buildInvoiceResponse } = require("../utils/invoiceBuilder");
 const { normalizeReturnStatus } = require("../utils/returnStatus");
-const { getPaymentStatusTransitionError } = require("../utils/paymentMethods");
+const { getPaymentStatusTransitionError, isInvoiceAvailable } = require("../utils/paymentMethods");
+const { getOrderStatusTransitionError } = require("../utils/orderLifecycle");
 const { markOrderPaymentPaid } = require("../utils/markPaymentPaid");
 const { generateDeliveryOtp, getDeliveryOtpExpiry } = require("../utils/deliveryOtp");
 const {
@@ -83,6 +84,12 @@ const applyOrderStatusUpdate = async (order, business, nextStatus) => {
 
     if (nextStatus === "Shipped" && !hasCourierTracking(order)) {
         return { skipped: true, reason: "no_courier_tracking" };
+    }
+
+    const transitionError = getOrderStatusTransitionError(order, nextStatus);
+
+    if (transitionError) {
+        return { skipped: true, reason: "invalid_transition", message: transitionError };
     }
 
     if (nextStatus === "Cancelled" && previousStatus !== "Cancelled") {
@@ -284,6 +291,13 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     const result = await applyOrderStatusUpdate(order, business, nextStatus);
 
     if (result.skipped) {
+        if (result.reason === "invalid_transition") {
+            return res.status(400).json({
+                success: false,
+                message: result.message
+            });
+        }
+
         const messages = {
             terminal: "Cannot update status of completed, delivered, or cancelled orders",
             unchanged: "Order already has this status",
@@ -352,7 +366,8 @@ const bulkUpdateOrderStatus = asyncHandler(async (req, res) => {
         } else {
             skipped.push({
                 orderId: order._id,
-                reason: result.reason
+                reason: result.reason,
+                ...(result.message && { message: result.message })
             });
         }
     }
@@ -575,6 +590,15 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
         order.trackingUrl = trackingUrl?.trim() || autoUrl || order.trackingUrl || "";
 
         if (markShipped) {
+            const transitionError = getOrderStatusTransitionError(order, "Shipped");
+
+            if (transitionError) {
+                return res.status(400).json({
+                    success: false,
+                    message: transitionError
+                });
+            }
+
             order.orderStatus = "Shipped";
             appendDeliveryTimeline(order, {
                 status: "Shipped",
@@ -600,6 +624,15 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
         }
 
         if (markOutForDelivery || (deliveryPersonName && deliveryPersonPhone)) {
+            const transitionError = getOrderStatusTransitionError(order, "OutForDelivery");
+
+            if (transitionError) {
+                return res.status(400).json({
+                    success: false,
+                    message: transitionError
+                });
+            }
+
             order.orderStatus = "OutForDelivery";
             issueDeliveryOtp(order);
             appendDeliveryTimeline(order, {
@@ -624,6 +657,15 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
         }
 
         if (markReadyForPickup) {
+            const transitionError = getOrderStatusTransitionError(order, "OutForDelivery");
+
+            if (transitionError) {
+                return res.status(400).json({
+                    success: false,
+                    message: transitionError
+                });
+            }
+
             order.orderStatus = "OutForDelivery";
             issueDeliveryOtp(order);
             appendDeliveryTimeline(order, {
@@ -647,16 +689,23 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
 });
 
 const getOrderInvoice = asyncHandler(async (req, res) => {
-    const { error } = await ensureOwnerOrder(req.params.id, req.user._id);
+    const ownerContext = await ensureOwnerOrder(req.params.id, req.user._id);
 
-    if (error) {
-        return res.status(error.status).json({
+    if (ownerContext.error) {
+        return res.status(ownerContext.error.status).json({
             success: false,
-            message: error.message
+            message: ownerContext.error.message
         });
     }
 
-    const order = await Order.findById(req.params.id);
+    const { order } = ownerContext;
+
+    if (!isInvoiceAvailable(order)) {
+        return res.status(403).json({
+            success: false,
+            message: "Invoice available after payment is confirmed"
+        });
+    }
 
     const invoice = await buildInvoiceResponse(order);
 

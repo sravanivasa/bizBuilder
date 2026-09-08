@@ -5,6 +5,7 @@ const asyncHandler = require("../middleware/asyncHandler");
 const { appendDeliveryTimeline } = require("../utils/deliveryTimeline");
 const { isDeliveryOtpValid } = require("../utils/deliveryOtp");
 const { isTerminalOrderStatus } = require("../utils/orderStatus");
+const { getOrderStatusTransitionError } = require("../utils/orderLifecycle");
 const {
     notifyCustomerOrderDelivered
 } = require("../services/whatsappService");
@@ -164,6 +165,15 @@ const verifyDeliveryOtp = asyncHandler(async (req, res) => {
         return res.status(400).json({
             success: false,
             message: "Invalid or expired OTP"
+        });
+    }
+
+    const transitionError = getOrderStatusTransitionError(order, "Delivered");
+
+    if (transitionError) {
+        return res.status(400).json({
+            success: false,
+            message: transitionError
         });
     }
 
