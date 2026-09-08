@@ -122,7 +122,6 @@ export const saveCustomerOrder = (order) => {
         orderId: String(orderId),
         shortOrderId:
             order.shortOrderId || String(orderId).slice(-6).toUpperCase(),
-        trackingToken: order.trackingToken || "",
         phone: order.phone || order.customerPhone,
         customerName: order.customerName || "",
         customerAddress: order.customerAddress || "",
@@ -188,6 +187,26 @@ export const removeCustomerOrder = (orderId) => {
 export const updateCustomerOrderStatus = (orderId, orderStatus) => {
     const orders = readOrders().map((item) =>
         item.orderId === String(orderId) ? { ...item, orderStatus } : item
+    );
+    writeOrders(orders);
+};
+
+export const updateCustomerOrderFromTrack = (orderId, trackedOrder) => {
+    if (!trackedOrder) {
+        return;
+    }
+
+    const orders = readOrders().map((item) =>
+        item.orderId === String(orderId)
+            ? {
+                  ...item,
+                  orderStatus: trackedOrder.orderStatus || item.orderStatus,
+                  paymentStatus: trackedOrder.paymentStatus || item.paymentStatus,
+                  paymentMethod: trackedOrder.paymentMethod || item.paymentMethod,
+                  totalAmount: trackedOrder.totalAmount ?? item.totalAmount,
+                  updatedAt: trackedOrder.updatedAt || item.updatedAt
+              }
+            : item
     );
     writeOrders(orders);
 };

@@ -40,6 +40,15 @@ const limiter = rateLimit({
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
 
+// Behind a single reverse proxy (e.g. Railway): set TRUST_PROXY=1 in production.
+// Local dev leaves this unset so rate limits use the direct client connection.
+const trustProxySetting = process.env.TRUST_PROXY;
+if (trustProxySetting === "1" || trustProxySetting === "true") {
+    app.set("trust proxy", 1);
+} else if (trustProxySetting && trustProxySetting !== "0" && trustProxySetting !== "false") {
+    app.set("trust proxy", trustProxySetting);
+}
+
 app.use(helmet());
 app.use(limiter);
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));

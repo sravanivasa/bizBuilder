@@ -509,8 +509,7 @@ const PAYMENT_BUSINESS_FIELDS = [
     "bankAccountName",
     "bankName",
     "bankAccountNumber",
-    "bankIfsc",
-    "autoConfirmOnlinePayments"
+    "bankIfsc"
 ];
 
 const PAYMENT_PAGE_BUSINESS_BASE_FIELDS = ["_id", "businessName", "slug"];
@@ -607,7 +606,6 @@ const getPaymentPage = asyncHandler(async (req, res) => {
             gstAmount: order.gstAmount || 0,
             gstRate: order.gstRate || 0,
             customerName: order.customerName,
-            customerPhone: order.customerPhone,
             razorpayConfigured: paymentAvailable && razorpayConfigured,
             razorpayKeyId: paymentAvailable && razorpayCredentials?.keyId ? razorpayCredentials.keyId : null,
             upiLink,
@@ -802,6 +800,20 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
         });
     }
 
+    if (!order.razorpayOrderId) {
+        return res.status(400).json({
+            success: false,
+            message: "Payment session not found for this order. Please start payment again."
+        });
+    }
+
+    if (order.razorpayOrderId !== razorpay_order_id) {
+        return res.status(400).json({
+            success: false,
+            message: "Payment order mismatch"
+        });
+    }
+
     const isValid = verifyPaymentSignature({
         orderId: razorpay_order_id,
         paymentId: razorpay_payment_id,
@@ -816,15 +828,6 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
         });
     }
 
-    if (order.razorpayOrderId && order.razorpayOrderId !== razorpay_order_id) {
-        return res.status(400).json({
-            success: false,
-            message: "Payment order mismatch"
-        });
-    }
-
-    order.razorpayOrderId = razorpay_order_id;
-
     let razorpayPayment;
 
     try {
@@ -833,6 +836,20 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
         return res.status(400).json({
             success: false,
             message: "Could not verify payment amount"
+        });
+    }
+
+    if (razorpayPayment.order_id !== razorpay_order_id) {
+        return res.status(400).json({
+            success: false,
+            message: "Payment does not belong to this order"
+        });
+    }
+
+    if (razorpayPayment.status !== "captured") {
+        return res.status(400).json({
+            success: false,
+            message: "Payment has not been captured yet"
         });
     }
 

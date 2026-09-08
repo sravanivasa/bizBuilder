@@ -24,7 +24,7 @@ import {
 } from "../utils/orderStatus";
 import { getOrderAmounts, formatPrice } from "../utils/gstDisplay";
 import { getPaymentLabelKey } from "../constants/paymentMethods";
-import { getPaymentStatusLabelKey, paymentStatusBadgeClass } from "../utils/paymentStatus";
+import { getPaymentStatusLabelKey, paymentStatusBadgeClass, canViewInvoice } from "../utils/paymentStatus";
 import { formatTimeAgo } from "../utils/timeAgo";
 
 const ORDERS_PER_PAGE = 12;
@@ -1338,12 +1338,14 @@ const Orders = () => {
                         )}
 
                         <div className="flex flex-wrap gap-2">
-                            <Link
-                                to={`/orders/${order._id}/invoice`}
-                                className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
-                            >
-                                {t("viewInvoice")}
-                            </Link>
+                            {canViewInvoice(order.paymentStatus) && (
+                                <Link
+                                    to={`/orders/${order._id}/invoice`}
+                                    className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+                                >
+                                    {t("viewInvoice")}
+                                </Link>
+                            )}
                             <button
                                 type="button"
                                 onClick={() =>

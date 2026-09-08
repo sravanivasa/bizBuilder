@@ -62,9 +62,13 @@ const getDeliveryOrder = asyncHandler(async (req, res) => {
     }
 
     if (isTerminalOrderStatus(order.orderStatus)) {
-        return res.status(400).json({
-            success: false,
-            message: "This delivery is already completed"
+        const deliveryOrder = await buildDeliveryOrderResponse(order);
+
+        return res.status(200).json({
+            success: true,
+            message: "This delivery is already completed",
+            completed: true,
+            order: deliveryOrder
         });
     }
 

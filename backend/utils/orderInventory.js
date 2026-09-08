@@ -45,9 +45,14 @@ const restoreStockOnce = async (order) => {
         return false;
     }
 
-    await restoreStock(order.products);
-    order.stockRestoredAt = new Date();
-    return true;
+    try {
+        await restoreStock(order.products);
+        order.stockRestoredAt = claimed.stockRestoredAt;
+        return true;
+    } catch (error) {
+        await Order.findByIdAndUpdate(order._id, { $unset: { stockRestoredAt: "" } });
+        throw error;
+    }
 };
 
 module.exports = {

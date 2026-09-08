@@ -599,6 +599,13 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
                 });
             }
 
+            if (!hasCourierTracking(order)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Courier tracking is required before marking as shipped"
+                });
+            }
+
             order.orderStatus = "Shipped";
             appendDeliveryTimeline(order, {
                 status: "Shipped",
@@ -623,7 +630,7 @@ const updateOrderDelivery = asyncHandler(async (req, res) => {
             order.deliveryToken = generateDeliveryToken();
         }
 
-        if (markOutForDelivery || (deliveryPersonName && deliveryPersonPhone)) {
+        if (markOutForDelivery) {
             const transitionError = getOrderStatusTransitionError(order, "OutForDelivery");
 
             if (transitionError) {

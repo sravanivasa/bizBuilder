@@ -84,7 +84,22 @@ export const returnBadgeClass = (status) => {
     }
 };
 
+export const RETURN_WINDOW_DAYS = 30;
+
+export const isReturnWindowOpen = (order) => {
+    const referenceDate = order?.updatedAt || order?.createdAt;
+
+    if (!referenceDate) {
+        return false;
+    }
+
+    const windowEnd = new Date(referenceDate);
+    windowEnd.setDate(windowEnd.getDate() + RETURN_WINDOW_DAYS);
+    return new Date() <= windowEnd;
+};
+
 export const canRequestReturn = (order) =>
     order &&
     ["Delivered", "Completed"].includes(order.orderStatus) &&
-    (!order.returnStatus || order.returnStatus === "None");
+    (!order.returnStatus || order.returnStatus === "None") &&
+    isReturnWindowOpen(order);

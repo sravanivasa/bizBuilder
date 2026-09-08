@@ -38,7 +38,7 @@ router.post("/orders/pay/:token/razorpay-order", publicCapabilityLimiter, create
 router.post("/orders/pay/:token/verify", publicCapabilityLimiter, ...verifyRazorpayPaymentValidation, verifyRazorpayPayment);
 router.get("/orders/track", publicCapabilityLimiter, ...trackOrderValidation, trackPublicOrderGlobal);
 
-router.get("/deliver/:deliveryToken", getDeliveryOrder);
+router.get("/deliver/:deliveryToken", publicCapabilityLimiter, getDeliveryOrder);
 router.post(
     "/deliver/:deliveryToken/photo",
     publicUploadLimiter,
@@ -59,6 +59,7 @@ router.post("/businesses/:idOrSlug/orders", publicOrderLimiter, ...publicOrderVa
 router.get("/businesses/:idOrSlug/orders/track", publicCapabilityLimiter, ...trackOrderValidation, trackPublicOrder);
 router.post(
     "/businesses/:idOrSlug/orders/:orderId/return-request",
+    publicCapabilityLimiter,
     publicUploadLimiter,
     returnUpload.fields([
         { name: "photos", maxCount: 5 },

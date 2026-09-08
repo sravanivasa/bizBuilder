@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import {
     getPaymentPage,
     createRazorpayOrder,
-    verifyRazorpayPayment
+    verifyRazorpayPayment,
+    confirmPayment
 } from "../api/public";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { getPaymentLabelKey } from "../constants/paymentMethods";
@@ -39,6 +40,8 @@ const Payment = () => {
     const [razorpayLoading, setRazorpayLoading] = useState(false);
     const [razorpayError, setRazorpayError] = useState("");
     const [checkoutOpen, setCheckoutOpen] = useState(false);
+    const [confirmSubmitting, setConfirmSubmitting] = useState(false);
+    const [confirmError, setConfirmError] = useState("");
     const checkoutOpenedRef = useRef(false);
 
     const loadPayment = useCallback(async () => {
@@ -61,10 +64,11 @@ const Payment = () => {
 
     const isPaid = payment?.paymentStatus === "Paid";
     const isSubmitted = payment?.paymentStatus === "PaymentSubmitted";
+    const isFailed = payment?.paymentStatus === "Failed";
     const isCancelled = payment?.orderStatus === "Cancelled";
     const paymentAvailable = Boolean(payment?.paymentAvailable);
     const useRazorpay = Boolean(payment?.razorpayConfigured);
-    const showManualFallback = payment && paymentAvailable && !useRazorpay && !isPaid;
+    const showManualFallback = payment && paymentAvailable && !useRazorpay && !isPaid && !isSubmitted;
 
     const prepareRazorpayOrder = useCallback(async () => {
         if (!payment || isPaid || !useRazorpay || !paymentAvailable) {
@@ -162,6 +166,25 @@ const Payment = () => {
         }
     };
 
+    const handleConfirmManualPayment = async () => {
+        setConfirmSubmitting(true);
+        setConfirmError("");
+
+        try {
+            const { data } = await confirmPayment(token);
+            const { data: refreshed } = await getPaymentPage(token);
+            setPayment(refreshed.payment);
+
+            if (data.paymentStatus !== "PaymentSubmitted" && refreshed.payment.paymentStatus !== "PaymentSubmitted") {
+                setConfirmError(t("paymentFailed"));
+            }
+        } catch (err) {
+            setConfirmError(err.response?.data?.message || t("paymentFailed"));
+        } finally {
+            setConfirmSubmitting(false);
+        }
+    };
+
     const storePath = payment?.business
         ? getStorePath(payment.business._id, payment.business.slug || storeSlug)
         : storeSlug
@@ -186,26 +209,25 @@ const Payment = () => {
         Boolean(business?.bankIfsc);
 
     const isMobile = isMobileDevice();
-    const showPaymentInstructions = payment && paymentAvailable && !isPaid && !isSubmitted;
+    const showPaymentInstructions = payment && paymentAvailable && !isPaid && !isSubmitted && !isFailed;
     const showDirectUpiPay =
         showPaymentInstructions &&
         isUpiMethod &&
         hasUpiDetails &&
-        showManualFallback &&
-        Boolean(payment.appPayLink);
+        showManualFallback;
     const showRazorpayCheckout =
-        useRazorpay && showPaymentInstructions && !isPaid && !isSubmitted;
-    const showUpiQrOnRazorpay =
-        showRazorpayCheckout && hasUpiDetails && Boolean(payment.qrCodeUrl);
+        useRazorpay && showPaymentInstructions && !isPaid && !isSubmitted && !isFailed;
     const showInvoice = payment && canViewInvoice(payment.paymentStatus);
-    const headerIcon = isCancelled ? "⚠️" : isPaid ? "✓" : isSubmitted ? "⏳" : "💳";
+    const headerIcon = isCancelled ? "⚠️" : isPaid ? "✓" : isSubmitted ? "⏳" : isFailed ? "⚠️" : "💳";
     const headerTitle = isCancelled
         ? t("orderStatusCancelled")
         : isPaid
           ? t("orderConfirmedTitle")
           : isSubmitted
             ? t("paymentSubmittedTitle")
-            : t("completePaymentTitle");
+            : isFailed
+              ? t("paymentFailedStateTitle")
+              : t("completePaymentTitle");
     const headerMessage = isCancelled
         ? t("paymentCancelledUnavailable", {
               defaultValue:
@@ -215,7 +237,9 @@ const Payment = () => {
           ? t("paymentConfirmed", { id: payment?.shortOrderId })
           : isSubmitted
             ? t("paymentSubmittedMessage", { id: payment?.shortOrderId })
-            : t("completePaymentMessage", { id: payment?.shortOrderId });
+            : isFailed
+              ? t("paymentFailedStateMessage")
+              : t("completePaymentMessage", { id: payment?.shortOrderId });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900">
@@ -321,7 +345,19 @@ const Payment = () => {
 
                         {isSubmitted && !isPaid && (
                             <div className="rounded-2xl border border-blue-400/30 bg-blue-500/15 px-4 py-3 text-sm text-blue-100">
-                                {t("paymentDoneMessage", { id: payment.shortOrderId })}
+                                {t("paymentSubmittedAckMessage")}
+                            </div>
+                        )}
+
+                        {isFailed && !isPaid && !isSubmitted && (
+                            <div className="rounded-2xl border border-red-400/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+                                <p>{t("paymentFailedStateMessage")}</p>
+                                {paymentAvailable && useRazorpay && (
+                                    <p className="mt-2">{t("paymentFailedContactShop")}</p>
+                                )}
+                                {!paymentAvailable && (
+                                    <p className="mt-2">{t("paymentFailedContactShop")}</p>
+                                )}
                             </div>
                         )}
 
@@ -352,29 +388,6 @@ const Payment = () => {
                                         ? t("loading")
                                         : t("payAmount", { amount: formatPrice(payment.totalAmount) })}
                                 </button>
-
-                                {showUpiQrOnRazorpay && (
-                                    <div className="mt-6 border-t border-white/10 pt-6">
-                                        <p className="text-sm font-medium text-emerald-50">
-                                            {t("paymentQrDesktopTitle")}
-                                        </p>
-                                        <p className="mt-1 text-xs text-emerald-100/60">
-                                            {t("paymentQrDesktopHint")}
-                                        </p>
-                                        <div className="mt-4 flex flex-col items-center gap-3">
-                                            <img
-                                                src={payment.qrCodeUrl}
-                                                alt={t("paymentQrAlt")}
-                                                className="h-44 w-44 rounded-2xl border border-white/10 bg-white p-2"
-                                            />
-                                            {business?.upiId && (
-                                                <p className="font-mono text-xs text-emerald-100">
-                                                    {business.upiId}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
 
                                 {isRazorpayTestKey(payment?.razorpayKeyId) && (
                                     <p className="mt-4 text-xs text-amber-100/80">
@@ -440,6 +453,24 @@ const Payment = () => {
                                         <p className="text-center text-xs text-emerald-100/60">
                                             {t("manualUpiAfterPayHint")}
                                         </p>
+                                        {confirmError && (
+                                            <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                                                {confirmError}
+                                            </p>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmManualPayment}
+                                            disabled={confirmSubmitting}
+                                            className="flex w-full justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {confirmSubmitting
+                                                ? t("loading")
+                                                : t("paymentSubmitForVerification")}
+                                        </button>
+                                        <p className="text-center text-xs text-emerald-100/60">
+                                            {t("paymentSubmitForVerificationHint")}
+                                        </p>
                                     </div>
                                 ) : (
                                     <p className="mt-4 text-sm text-amber-100/90">
@@ -490,6 +521,24 @@ const Payment = () => {
                                         </div>
                                         <p className="text-xs text-emerald-100/60">
                                             {t("paymentBankTransferHint")}
+                                        </p>
+                                        {confirmError && (
+                                            <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                                                {confirmError}
+                                            </p>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmManualPayment}
+                                            disabled={confirmSubmitting}
+                                            className="flex w-full justify-center rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {confirmSubmitting
+                                                ? t("loading")
+                                                : t("paymentSubmitForVerification")}
+                                        </button>
+                                        <p className="text-xs text-emerald-100/60">
+                                            {t("paymentSubmitForVerificationHint")}
                                         </p>
                                     </div>
                                 ) : (

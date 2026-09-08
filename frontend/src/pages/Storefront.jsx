@@ -291,7 +291,6 @@ const Storefront = () => {
                 businessSlug: business?.slug,
                 orderId: data.order._id,
                 shortOrderId: data.order.shortOrderId || data.order._id?.slice(-6).toUpperCase(),
-                trackingToken,
                 phone: data.order.customerPhone,
                 customerName: data.order.customerName,
                 customerAddress: data.order.customerAddress,

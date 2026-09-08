@@ -1,3 +1,4 @@
+const Order = require("../models/Orders");
 const { appendDeliveryTimeline } = require("./deliveryTimeline");
 const {
     notifyCustomerPaymentConfirmed,
@@ -6,35 +7,58 @@ const {
 
 /** Shared by browser verify endpoint and Razorpay webhook — idempotent. */
 const markOrderPaymentPaid = async (order, business, { razorpayPaymentId, note = "Payment confirmed via Razorpay" } = {}) => {
-    if (order.paymentStatus === "Paid") {
-        return { alreadyPaid: true, order };
+    const current = await Order.findById(order._id);
+
+    if (!current) {
+        return { alreadyPaid: false, cancelled: false, order };
     }
 
-    if (order.orderStatus === "Cancelled") {
-        return { alreadyPaid: false, cancelled: true, order };
+    if (current.paymentStatus === "Paid") {
+        return { alreadyPaid: true, order: current };
     }
 
-    order.paymentStatus = "Paid";
-    order.paidAt = new Date();
+    if (current.orderStatus === "Cancelled") {
+        return { alreadyPaid: false, cancelled: true, order: current };
+    }
+
+    const setFields = {
+        paymentStatus: "Paid",
+        paidAt: new Date()
+    };
 
     if (razorpayPaymentId) {
-        order.razorpayPaymentId = razorpayPaymentId;
+        setFields.razorpayPaymentId = razorpayPaymentId;
     }
 
-    if (order.orderStatus === "Pending" || order.orderStatus === "New") {
-        order.orderStatus = "Confirmed";
-        appendDeliveryTimeline(order, {
+    const updated = await Order.findOneAndUpdate(
+        { _id: current._id, paymentStatus: { $ne: "Paid" }, orderStatus: { $ne: "Cancelled" } },
+        { $set: setFields },
+        { new: true }
+    );
+
+    if (!updated) {
+        const latest = await Order.findById(current._id);
+
+        if (latest?.orderStatus === "Cancelled") {
+            return { alreadyPaid: false, cancelled: true, order: latest };
+        }
+
+        return { alreadyPaid: true, order: latest || current };
+    }
+
+    if (updated.orderStatus === "Pending" || updated.orderStatus === "New") {
+        updated.orderStatus = "Confirmed";
+        appendDeliveryTimeline(updated, {
             status: "Confirmed",
             note
         });
+        await updated.save();
     }
 
-    await order.save();
+    notifyCustomerPaymentConfirmed(updated, business);
+    notifyOwnerPaymentReceived(updated, business);
 
-    notifyCustomerPaymentConfirmed(order, business);
-    notifyOwnerPaymentReceived(order, business);
-
-    return { alreadyPaid: false, order };
+    return { alreadyPaid: false, order: updated };
 };
 
 module.exports = {

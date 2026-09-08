@@ -39,6 +39,9 @@ const DeliverOrder = () => {
                 const { data } = await getDeliveryOrder(deliveryToken);
                 if (!cancelled) {
                     setOrder(data.order);
+                    if (data.completed || ["Delivered", "Completed"].includes(data.order?.orderStatus)) {
+                        setDelivered(true);
+                    }
                 }
             } catch (err) {
                 if (!cancelled) {

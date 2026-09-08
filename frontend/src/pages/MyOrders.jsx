@@ -8,7 +8,7 @@ import {
     getCustomerOrders,
     getStorePath,
     getTrackPath,
-    updateCustomerOrderStatus
+    updateCustomerOrderFromTrack
 } from "../utils/customerOrdersStorage";
 import { canRequestReturn, normalizeReturnStatus, returnBadgeClass, statusBadgeClass } from "../utils/orderStatus";
 import { canViewInvoice } from "../utils/paymentStatus";
@@ -72,7 +72,7 @@ const MyOrders = () => {
                     const order = data.order;
                     const status = order?.orderStatus;
                     if (status) {
-                        updateCustomerOrderStatus(item.orderId, status);
+                        updateCustomerOrderFromTrack(item.orderId, order);
                     }
                     return {
                         ...item,
