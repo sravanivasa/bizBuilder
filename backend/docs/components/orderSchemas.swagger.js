@@ -77,7 +77,7 @@
  *           default: Cash
  *         paymentStatus:
  *           type: string
- *           enum: [Pending, Paid]
+ *           enum: [Pending, AwaitingPayment, PaymentSubmitted, Paid, Failed, COD]
  *           default: Pending
  *         orderStatus:
  *           type: string
@@ -170,4 +170,12 @@
  *         returnCourier:
  *           type: string
  *           maxLength: 100
+ *     OrderPaymentStatusUpdateInput:
+ *       type: object
+ *       required: [paymentStatus]
+ *       properties:
+ *         paymentStatus:
+ *           type: string
+ *           enum: [Pending, AwaitingPayment, PaymentSubmitted, Paid, Failed, COD]
+ *           example: Paid
  */

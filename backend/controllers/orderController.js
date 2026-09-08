@@ -11,6 +11,8 @@ const { buildDeliveryPersonUrl } = require("../utils/deliveryUrl");
 const { appendDeliveryTimeline } = require("../utils/deliveryTimeline");
 const { buildInvoiceResponse } = require("../utils/invoiceBuilder");
 const { normalizeReturnStatus } = require("../utils/returnStatus");
+const { getPaymentStatusTransitionError } = require("../utils/paymentMethods");
+const { markOrderPaymentPaid } = require("../utils/markPaymentPaid");
 const { generateDeliveryOtp, getDeliveryOtpExpiry } = require("../utils/deliveryOtp");
 const {
     notifyCustomerOrderConfirmed,
@@ -23,8 +25,7 @@ const {
     notifyCustomerOutForDelivery,
     notifyCustomerDeliveryOtp,
     notifyDeliveryPersonLink,
-    notifyCustomerCourierTracking,
-    notifyCustomerPaymentConfirmed
+    notifyCustomerCourierTracking
 } = require("../services/whatsappService");
 
 const DELETABLE_ORDER_STATUSES = ["Pending", "New", "Cancelled"];
@@ -676,43 +677,52 @@ const updatePaymentStatus = asyncHandler(async (req, res) => {
         });
     }
 
-    const { error } = await ensureOwnerOrder(req.params.id, req.user._id);
+    const ownerContext = await ensureOwnerOrder(req.params.id, req.user._id);
 
-    if (error) {
-        return res.status(error.status).json({
+    if (ownerContext.error) {
+        return res.status(ownerContext.error.status).json({
             success: false,
-            message: error.message
+            message: ownerContext.error.message
         });
     }
 
-    const order = await Order.findById(req.params.id);
+    const { order, business } = ownerContext;
     const { paymentStatus } = req.body;
-    const previousPaymentStatus = order.paymentStatus;
+    const transitionError = getPaymentStatusTransitionError(order, paymentStatus);
 
-    order.paymentStatus = paymentStatus;
-
-    if (paymentStatus === "Paid" && previousPaymentStatus !== "Paid") {
-        const business = await Business.findById(order.business);
-
-        if (order.orderStatus === "Pending" || order.orderStatus === "New") {
-            order.orderStatus = "Confirmed";
-            appendDeliveryTimeline(order, {
-                status: "Confirmed",
-                note: "Payment verified by owner"
-            });
-        }
-
-        notifyCustomerPaymentConfirmed(order, business);
+    if (transitionError) {
+        return res.status(400).json({
+            success: false,
+            message: transitionError
+        });
     }
 
-    await order.save();
+    if (paymentStatus === "Paid") {
+        const { order: paidOrder } = await markOrderPaymentPaid(order, business, {
+            note: "Payment verified by owner"
+        });
 
-    const responseOrder = attachDeliveryPersonUrl(order);
+        return res.status(200).json({
+            success: true,
+            message: "Payment status updated successfully",
+            order: attachDeliveryPersonUrl(paidOrder)
+        });
+    }
+
+    if (order.paymentStatus !== paymentStatus) {
+        order.paymentStatus = paymentStatus;
+
+        if (paymentStatus === "PaymentSubmitted") {
+            order.paymentSubmittedAt = new Date();
+        }
+
+        await order.save();
+    }
 
     res.status(200).json({
         success: true,
         message: "Payment status updated successfully",
-        order: responseOrder
+        order: attachDeliveryPersonUrl(order)
     });
 });
 

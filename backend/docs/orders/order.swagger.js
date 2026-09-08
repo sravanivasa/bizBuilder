@@ -114,4 +114,28 @@
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ * /api/orders/{id}/payment:
+ *   put:
+ *     summary: Update an order payment status (owner)
+ *     description: >
+ *       Owner-only payment status transitions. Paid is terminal and cannot be downgraded.
+ *       Legitimate paths include manual verification (AwaitingPayment or PaymentSubmitted to Paid)
+ *       and offline Cash/Card orders (Pending to Paid). Invalid transitions return 400.
+ *     tags: [Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ $ref: '#/components/parameters/OrderId' }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/OrderPaymentStatusUpdateInput' }
+ *     responses:
+ *       200:
+ *         description: Payment status updated successfully
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } }
+ *       400:
+ *         description: Invalid payment status or disallowed transition
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
