@@ -21,6 +21,7 @@ const businessRoutes = require("./routes/businessRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const customerRoutes = require("./routes/customerRoutes");
+const expenseRoutes = require("./routes/expenseRoutes");
 const publicRoutes = require("./routes/publicRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
 const errorHandler = require("./middleware/errorMiddleware");
@@ -84,6 +85,7 @@ app.use("/api/businesses", businessRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/customers", customerRoutes);
+app.use("/api/expenses", expenseRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

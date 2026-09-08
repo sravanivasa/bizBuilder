@@ -10,6 +10,7 @@ import BusinessSetup from "./pages/BusinessSetup";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
+import Expenses from "./pages/Expenses";
 import Storefront from "./pages/Storefront";
 import TrackOrder from "./pages/TrackOrder";
 import DeliverOrder from "./pages/DeliverOrder";
@@ -50,6 +51,7 @@ const App = () => {
                         <Route path="/products" element={<Products />} />
                         <Route path="/orders" element={<Orders />} />
                         <Route path="/customers" element={<Customers />} />
+                        <Route path="/expenses" element={<Expenses />} />
                         <Route path="/orders/:orderId/invoice" element={<Invoice ownerMode />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>

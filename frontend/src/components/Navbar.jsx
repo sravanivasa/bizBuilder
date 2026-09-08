@@ -26,7 +26,8 @@ const Navbar = () => {
         { to: "/business", label: t("business") },
         { to: "/products", label: t("products") },
         { to: "/orders", label: t("orders") },
-        { to: "/customers", label: t("customers") }
+        { to: "/customers", label: t("customers") },
+        { to: "/expenses", label: t("expenses") }
     ];
 
     const linkClass = (path) => {
