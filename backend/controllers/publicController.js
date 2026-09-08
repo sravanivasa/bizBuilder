@@ -8,7 +8,12 @@ const pickFields = require("../utils/pickFields");
 const { phonesMatch, normalizePhoneForMatch } = require("../utils/phoneMatch");
 const { createOrderForBusiness } = require("../utils/processOrderCreation");
 const { resolveBusiness } = require("../utils/resolveBusiness");
-const { buildOrderTrackUrl } = require("../utils/orderTrackUrl");
+const { buildOrderTrackUrl, buildOrderPayUrl } = require("../utils/orderTrackUrl");
+const {
+    findOrderByTrackingToken,
+    getCancelledOrderPaymentError,
+    getOnlinePaymentMethodError
+} = require("../utils/publicOrderCapability");
 const { buildInvoiceResponse } = require("../utils/invoiceBuilder");
 const { normalizeReturnStatus } = require("../utils/returnStatus");
 const {
@@ -105,7 +110,7 @@ const isReturnWindowOpen = (order) => {
     return new Date() <= windowEnd;
 };
 
-const buildTrackedOrderResponse = async (order, { viaToken = false } = {}) => {
+const buildTrackedOrderResponse = async (order) => {
     const business = await Business.findById(order.business).select(PUBLIC_BUSINESS_FIELDS.join(" "));
 
     const productIds = order.products.map((item) => item.product);
@@ -157,12 +162,24 @@ const buildTrackedOrderResponse = async (order, { viaToken = false } = {}) => {
             : { businessName: "Shop" }
     };
 
-    if (viaToken) {
-        response.customerPhone = order.customerPhone;
-    }
-
     return response;
 };
+
+const buildPublicOrderConfirmation = (order) => ({
+    _id: order._id,
+    shortOrderId: shortOrderId(order._id),
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    customerAddress: order.customerAddress,
+    subtotal: order.subtotal != null ? order.subtotal : order.totalAmount,
+    gstAmount: order.gstAmount || 0,
+    gstRate: order.gstRate || 0,
+    totalAmount: order.totalAmount,
+    orderStatus: order.orderStatus,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    createdAt: order.createdAt
+});
 
 const getPublicBusiness = asyncHandler(async (req, res) => {
     const business = await resolveBusiness(req.params.idOrSlug);
@@ -245,12 +262,16 @@ const createPublicOrder = asyncHandler(async (req, res) => {
         });
 
         const trackingUrl = buildOrderTrackUrl(order, business);
+        const payUrl = isOnlinePaymentMethod(order.paymentMethod)
+            ? buildOrderPayUrl(order, business)
+            : null;
 
         res.status(201).json({
             success: true,
             message: "Order placed successfully",
-            order,
+            order: buildPublicOrderConfirmation(order),
             trackingUrl,
+            payUrl,
             whatsappEnabled: isWhatsAppConfigured()
         });
     } catch (error) {
@@ -266,24 +287,16 @@ const createPublicOrder = asyncHandler(async (req, res) => {
 
 const trackPublicOrderByToken = asyncHandler(async (req, res) => {
     const { token } = req.params;
+    const lookup = await findOrderByTrackingToken(Order, token);
 
-    if (!token || token.length < 32) {
-        return res.status(400).json({
+    if (lookup.error) {
+        return res.status(lookup.error.status).json({
             success: false,
-            message: "Invalid tracking token"
+            message: lookup.error.message
         });
     }
 
-    const order = await Order.findOne({ trackingToken: token });
-
-    if (!order) {
-        return res.status(404).json({
-            success: false,
-            message: "Order not found"
-        });
-    }
-
-    const trackedOrder = await buildTrackedOrderResponse(order, { viaToken: true });
+    const trackedOrder = await buildTrackedOrderResponse(lookup.order);
 
     res.status(200).json({
         success: true,
@@ -354,9 +367,9 @@ const trackPublicOrder = asyncHandler(async (req, res) => {
     }
 
     if (!phonesMatch(order.customerPhone, phone)) {
-        return res.status(403).json({
+        return res.status(404).json({
             success: false,
-            message: "Phone number does not match this order"
+            message: "Order not found"
         });
     }
 
@@ -457,22 +470,16 @@ const requestPublicReturn = asyncHandler(async (req, res) => {
 
 const getPublicInvoiceByToken = asyncHandler(async (req, res) => {
     const { token } = req.params;
+    const lookup = await findOrderByTrackingToken(Order, token);
 
-    if (!token || token.length < 32) {
-        return res.status(400).json({
+    if (lookup.error) {
+        return res.status(lookup.error.status).json({
             success: false,
-            message: "Invalid invoice token"
+            message: lookup.error.message
         });
     }
 
-    const order = await Order.findOne({ trackingToken: token });
-
-    if (!order) {
-        return res.status(404).json({
-            success: false,
-            message: "Order not found"
-        });
-    }
+    const order = lookup.order;
 
     if (!isInvoiceAvailable(order)) {
         return res.status(403).json({
@@ -538,27 +545,22 @@ const buildPaymentPageBusiness = (business, order, { razorpayConfigured }) => {
 
 const getPaymentPage = asyncHandler(async (req, res) => {
     const { token } = req.params;
+    const lookup = await findOrderByTrackingToken(Order, token);
 
-    if (!token || token.length < 32) {
-        return res.status(400).json({
+    if (lookup.error) {
+        return res.status(lookup.error.status).json({
             success: false,
-            message: "Invalid payment token"
+            message: lookup.error.message
         });
     }
 
-    const order = await Order.findOne({ trackingToken: token });
+    const order = lookup.order;
+    const paymentMethodError = getOnlinePaymentMethodError(order);
 
-    if (!order) {
-        return res.status(404).json({
+    if (paymentMethodError) {
+        return res.status(paymentMethodError.status).json({
             success: false,
-            message: "Order not found"
-        });
-    }
-
-    if (!isOnlinePaymentMethod(order.paymentMethod)) {
-        return res.status(400).json({
-            success: false,
-            message: "This order does not require online payment"
+            message: paymentMethodError.message
         });
     }
 
@@ -612,27 +614,31 @@ const getPaymentPage = asyncHandler(async (req, res) => {
 
 const confirmPayment = asyncHandler(async (req, res) => {
     const { token } = req.params;
+    const lookup = await findOrderByTrackingToken(Order, token);
 
-    if (!token || token.length < 32) {
-        return res.status(400).json({
+    if (lookup.error) {
+        return res.status(lookup.error.status).json({
             success: false,
-            message: "Invalid payment token"
+            message: lookup.error.message
         });
     }
 
-    const order = await Order.findOne({ trackingToken: token });
+    const order = lookup.order;
+    const cancelledError = getCancelledOrderPaymentError(order);
 
-    if (!order) {
-        return res.status(404).json({
+    if (cancelledError) {
+        return res.status(cancelledError.status).json({
             success: false,
-            message: "Order not found"
+            message: cancelledError.message
         });
     }
 
-    if (!isOnlinePaymentMethod(order.paymentMethod)) {
-        return res.status(400).json({
+    const paymentMethodError = getOnlinePaymentMethodError(order);
+
+    if (paymentMethodError) {
+        return res.status(paymentMethodError.status).json({
             success: false,
-            message: "This order does not require online payment"
+            message: paymentMethodError.message
         });
     }
 
@@ -666,27 +672,31 @@ const confirmPayment = asyncHandler(async (req, res) => {
 
 const createRazorpayOrderForPayment = asyncHandler(async (req, res) => {
     const { token } = req.params;
+    const lookup = await findOrderByTrackingToken(Order, token);
 
-    if (!token || token.length < 32) {
-        return res.status(400).json({
+    if (lookup.error) {
+        return res.status(lookup.error.status).json({
             success: false,
-            message: "Invalid payment token"
+            message: lookup.error.message
         });
     }
 
-    const order = await Order.findOne({ trackingToken: token });
+    const order = lookup.order;
+    const cancelledError = getCancelledOrderPaymentError(order);
 
-    if (!order) {
-        return res.status(404).json({
+    if (cancelledError) {
+        return res.status(cancelledError.status).json({
             success: false,
-            message: "Order not found"
+            message: cancelledError.message
         });
     }
 
-    if (!isOnlinePaymentMethod(order.paymentMethod)) {
-        return res.status(400).json({
+    const paymentMethodError = getOnlinePaymentMethodError(order);
+
+    if (paymentMethodError) {
+        return res.status(paymentMethodError.status).json({
             success: false,
-            message: "This order does not require online payment"
+            message: paymentMethodError.message
         });
     }
 
@@ -756,27 +766,22 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
 
     const { token } = req.params;
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const lookup = await findOrderByTrackingToken(Order, token);
 
-    if (!token || token.length < 32) {
-        return res.status(400).json({
+    if (lookup.error) {
+        return res.status(lookup.error.status).json({
             success: false,
-            message: "Invalid payment token"
+            message: lookup.error.message
         });
     }
 
-    const order = await Order.findOne({ trackingToken: token });
+    const order = lookup.order;
+    const paymentMethodError = getOnlinePaymentMethodError(order);
 
-    if (!order) {
-        return res.status(404).json({
+    if (paymentMethodError) {
+        return res.status(paymentMethodError.status).json({
             success: false,
-            message: "Order not found"
-        });
-    }
-
-    if (!isOnlinePaymentMethod(order.paymentMethod)) {
-        return res.status(400).json({
-            success: false,
-            message: "This order does not require online payment"
+            message: paymentMethodError.message
         });
     }
 
@@ -791,6 +796,15 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
                 razorpayPaymentId: order.razorpayPaymentId || null,
                 paidAt: order.paidAt || null
             }
+        });
+    }
+
+    const cancelledError = getCancelledOrderPaymentError(order);
+
+    if (cancelledError) {
+        return res.status(cancelledError.status).json({
+            success: false,
+            message: cancelledError.message
         });
     }
 

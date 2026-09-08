@@ -6,6 +6,7 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 import { formatIndianPhone, isValidIndianPhone } from "../utils/checkoutValidation";
 import {
     getCustomerOrders,
+    getLastPhone,
     getLastPhoneForStore,
     getStorePath
 } from "../utils/customerOrdersStorage";
@@ -240,8 +241,11 @@ const TrackOrder = () => {
 
                 setOrder(data.order);
                 setOrderId(data.order?.shortOrderId || "");
-                if (data.order?.customerPhone) {
-                    setPhone(data.order.customerPhone);
+                const storedPhone =
+                    getLastPhone(data.order?.businessId) ||
+                    getLastPhoneForStore(routeStoreSlug || data.order?.businessId);
+                if (storedPhone) {
+                    setPhone(storedPhone);
                 }
                 if (data.order?.businessId) {
                     setBusinessId(data.order.businessId);

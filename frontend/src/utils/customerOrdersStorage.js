@@ -32,6 +32,34 @@ const writeLastPhones = (map) => {
 export const getStorePath = (businessId, businessSlug) =>
     `/store/${businessSlug || businessId}`;
 
+const CAPABILITY_TOKEN_PATTERN = /\/(?:track|pay|invoice)\/([a-f0-9]{64})$/i;
+
+export const extractCapabilityTokenFromUrl = (url) => {
+    if (!url) {
+        return "";
+    }
+
+    try {
+        const path = new URL(url, window.location.origin).pathname;
+        const match = path.match(CAPABILITY_TOKEN_PATTERN);
+        return match ? match[1] : "";
+    } catch {
+        return "";
+    }
+};
+
+export const getPayPathFromUrl = (url) => {
+    if (!url) {
+        return "";
+    }
+
+    try {
+        return new URL(url, window.location.origin).pathname;
+    } catch {
+        return "";
+    }
+};
+
 export const getTrackPath = (item) => {
     if (item.trackingToken) {
         const storePath = item.businessId

@@ -13,7 +13,9 @@ import { calculateGstBreakdown, formatPrice } from "../utils/gstDisplay";
 import { CHECKOUT_PAYMENT_METHODS, getPaymentLabelKey, isOnlinePaymentMethod } from "../constants/paymentMethods";
 import { canViewInvoice } from "../utils/paymentStatus";
 import {
+    extractCapabilityTokenFromUrl,
     getLastCheckoutDetails,
+    getPayPathFromUrl,
     getStorePath,
     saveCustomerOrder
 } from "../utils/customerOrdersStorage";
@@ -282,13 +284,14 @@ const Storefront = () => {
             };
 
             const { data } = await createPublicOrder(storeSlug, payload);
+            const trackingToken = extractCapabilityTokenFromUrl(data.trackingUrl);
 
             saveCustomerOrder({
                 businessId: business?._id,
                 businessSlug: business?.slug,
                 orderId: data.order._id,
-                shortOrderId: data.order._id?.slice(-6).toUpperCase(),
-                trackingToken: data.order.trackingToken,
+                shortOrderId: data.order.shortOrderId || data.order._id?.slice(-6).toUpperCase(),
+                trackingToken,
                 phone: data.order.customerPhone,
                 customerName: data.order.customerName,
                 customerAddress: data.order.customerAddress,
@@ -300,10 +303,7 @@ const Storefront = () => {
                 paymentMethod: data.order.paymentMethod
             });
 
-            if (
-                isOnlinePaymentMethod(data.order.paymentMethod) &&
-                data.order.trackingToken
-            ) {
+            if (isOnlinePaymentMethod(data.order.paymentMethod) && data.payUrl) {
                 const storePath =
                     getStorePath(business?._id, business?.slug || storeSlug) ||
                     `/store/${storeSlug}`;
@@ -312,7 +312,7 @@ const Storefront = () => {
                 setTouched({});
                 setValidationAttempted(false);
                 setCheckoutOpen(false);
-                navigate(`${storePath}/pay/${data.order.trackingToken}`);
+                navigate(getPayPathFromUrl(data.payUrl) || `${storePath}/pay/${trackingToken}`);
                 loadStore();
                 return;
             }
@@ -327,6 +327,7 @@ const Storefront = () => {
             setOrderSuccess({
                 order: data.order,
                 trackingUrl: data.trackingUrl,
+                trackingToken,
                 whatsappEnabled: data.whatsappEnabled
             });
         } catch (err) {
@@ -360,11 +361,14 @@ const Storefront = () => {
     }
 
     if (orderSuccess) {
-        const { order, trackingUrl, whatsappEnabled } = orderSuccess;
+        const { order, trackingUrl, trackingToken, whatsappEnabled } = orderSuccess;
         const storePath = getStorePath(business?._id, business?.slug) || `/store/${storeSlug}`;
-        const trackPath = order.trackingToken
-            ? `${storePath}/track/${order.trackingToken}`
-            : `${storePath}/track?orderId=${order._id?.slice(-6).toUpperCase()}&phone=${encodeURIComponent(order.customerPhone || "")}`;
+        const capabilityToken = trackingToken || extractCapabilityTokenFromUrl(trackingUrl);
+        const trackPath = trackingUrl
+            ? new URL(trackingUrl, window.location.origin).pathname
+            : capabilityToken
+              ? `${storePath}/track/${capabilityToken}`
+              : `${storePath}/track?orderId=${order.shortOrderId || order._id?.slice(-6).toUpperCase()}&phone=${encodeURIComponent(order.customerPhone || "")}`;
         const fullTrackLink = trackingUrl || `${window.location.origin}${trackPath}`;
 
         const handleCopyTrackLink = async () => {
@@ -397,9 +401,9 @@ const Storefront = () => {
                         <p className="mt-4 text-lg font-semibold text-white">
                             {t("totalAmount")}: {formatPrice(order.totalAmount)}
                         </p>
-                        {order.trackingToken && canViewInvoice(order.paymentStatus) && (
+                        {capabilityToken && canViewInvoice(order.paymentStatus) && (
                             <Link
-                                to={`/invoice/${order.trackingToken}`}
+                                to={`/invoice/${capabilityToken}`}
                                 className="mt-3 inline-flex text-sm font-medium text-emerald-300 transition hover:text-emerald-200"
                             >
                                 {t("viewInvoice")} →
