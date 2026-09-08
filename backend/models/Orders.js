@@ -249,6 +249,11 @@ const orderSchema = new mongoose.Schema(
 
         paidAt: {
             type: Date
+        },
+
+        stockRestoredAt: {
+            type: Date,
+            default: null
         }
     },
     {

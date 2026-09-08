@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const Order = require("../models/Orders");
 
 const decrementStock = async (items) => {
     const decremented = [];
@@ -33,7 +34,24 @@ const restoreStock = async (items) => {
     }
 };
 
+/** Atomically claim stock restoration once per order (cancel, delete, return receive). */
+const restoreStockOnce = async (order) => {
+    const claimed = await Order.findOneAndUpdate(
+        { _id: order._id, stockRestoredAt: null },
+        { $set: { stockRestoredAt: new Date() } }
+    );
+
+    if (!claimed) {
+        return false;
+    }
+
+    await restoreStock(order.products);
+    order.stockRestoredAt = new Date();
+    return true;
+};
+
 module.exports = {
     decrementStock,
-    restoreStock
+    restoreStock,
+    restoreStockOnce
 };

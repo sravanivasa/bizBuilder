@@ -39,11 +39,12 @@ router.post(
 
 router.get(
     "/business/:businessId",
+    authMiddleware,
     validateObjectId("businessId"),
     getProductsByBusiness
 );
 
-router.get("/:productId", validateObjectId("productId"), getProductById);
+router.get("/:productId", authMiddleware, validateObjectId("productId"), getProductById);
 
 router.put(
     "/:productId",

@@ -78,11 +78,17 @@ const verifyWebhookSignature = (body, signature, secret) => {
     return expected === signature;
 };
 
+const fetchRazorpayPayment = async (credentials, paymentId) => {
+    const razorpay = createRazorpayClient(credentials);
+    return razorpay.payments.fetch(paymentId);
+};
+
 module.exports = {
     getRazorpayCredentials,
     isRazorpayConfigured,
     createRazorpayOrder,
     verifyPaymentSignature,
     verifyWebhookSignature,
+    fetchRazorpayPayment,
     amountToPaise
 };

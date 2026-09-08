@@ -67,6 +67,11 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
         return res.status(200).json({ success: true, message: "Already paid" });
     }
 
+    if (order.orderStatus === "Cancelled") {
+        console.info(`Razorpay webhook: order ${order._id} is cancelled, ignoring payment`);
+        return res.status(200).json({ success: true, message: "Cancelled order ignored" });
+    }
+
     const business = await Business.findById(order.business);
     const credentials = getRazorpayCredentials(business);
 
@@ -81,10 +86,14 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
         });
     }
 
-    await markOrderPaymentPaid(order, business, {
+    const result = await markOrderPaymentPaid(order, business, {
         razorpayPaymentId: payment.id,
         note: "Payment confirmed via Razorpay webhook"
     });
+
+    if (result.cancelled) {
+        return res.status(200).json({ success: true, message: "Cancelled order ignored" });
+    }
 
     res.status(200).json({ success: true, message: "Payment processed" });
 });

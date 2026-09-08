@@ -21,7 +21,6 @@ const EMPTY_FORM = {
     bankName: "",
     bankAccountNumber: "",
     bankIfsc: "",
-    autoConfirmOnlinePayments: false,
     razorpayEnabled: false,
     razorpayKeyId: "",
     razorpayKeySecret: ""
@@ -71,7 +70,6 @@ const BusinessSetup = () => {
                         bankName: business.bankName || "",
                         bankAccountNumber: business.bankAccountNumber || "",
                         bankIfsc: business.bankIfsc || "",
-                        autoConfirmOnlinePayments: Boolean(business.autoConfirmOnlinePayments),
                         razorpayEnabled: Boolean(business.razorpayEnabled),
                         razorpayKeyId: business.razorpayKeyId || "",
                         razorpayKeySecret: business.hasRazorpaySecret
@@ -117,13 +115,12 @@ const BusinessSetup = () => {
             logo: form.logo.trim() || undefined,
             gstin: form.gstin.trim() || undefined,
             gstEnabled: form.gstEnabled,
-            gstRate: Number(form.gstRate) || 18,
+            gstRate: form.gstEnabled ? (form.gstRate !== "" ? Number(form.gstRate) : 18) : 0,
             upiId: form.upiId.trim() || undefined,
             bankAccountName: form.bankAccountName.trim() || undefined,
             bankName: form.bankName.trim() || undefined,
             bankAccountNumber: form.bankAccountNumber.trim() || undefined,
             bankIfsc: form.bankIfsc.trim() || undefined,
-            autoConfirmOnlinePayments: form.autoConfirmOnlinePayments,
             razorpayEnabled: form.razorpayEnabled,
             razorpayKeyId: form.razorpayKeyId.trim() || undefined
         };
@@ -152,7 +149,6 @@ const BusinessSetup = () => {
                     bankName: data.business.bankName || "",
                     bankAccountNumber: data.business.bankAccountNumber || "",
                     bankIfsc: data.business.bankIfsc || "",
-                    autoConfirmOnlinePayments: Boolean(data.business.autoConfirmOnlinePayments),
                     razorpayEnabled: Boolean(data.business.razorpayEnabled),
                     razorpayKeyId: data.business.razorpayKeyId || "",
                     razorpayKeySecret: data.business.hasRazorpaySecret
@@ -411,27 +407,6 @@ const BusinessSetup = () => {
                                     {renderField("bankIfsc", t("bankIfsc"), form.bankIfsc, {
                                         hint: t("bankIfscHint")
                                     })}
-                                </div>
-
-                                <div className="mt-5 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
-                                    <label className="flex cursor-pointer items-start gap-3">
-                                        <input
-                                            type="checkbox"
-                                            name="autoConfirmOnlinePayments"
-                                            checked={form.autoConfirmOnlinePayments}
-                                            onChange={handleChange}
-                                            disabled={!isEditing}
-                                            className="mt-1 h-4 w-4 rounded border-white/30 bg-white/10 text-emerald-500 focus:ring-emerald-400/40 disabled:opacity-50"
-                                        />
-                                        <span>
-                                            <span className="block text-sm font-medium text-emerald-50">
-                                                {t("autoConfirmOnlinePayments")}
-                                            </span>
-                                            <span className="mt-1 block text-xs text-amber-100/80">
-                                                {t("autoConfirmOnlinePaymentsHint")}
-                                            </span>
-                                        </span>
-                                    </label>
                                 </div>
                             </div>
 

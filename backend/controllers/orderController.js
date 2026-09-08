@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
 const { createOrderForBusiness } = require("../utils/processOrderCreation");
-const { restoreStock } = require("../utils/orderInventory");
+const { restoreStockOnce } = require("../utils/orderInventory");
 const { TERMINAL_ORDER_STATUSES } = require("../utils/orderStatus");
 const { buildCourierTrackingUrl } = require("../utils/courierTracking");
 const { buildDeliveryPersonUrl } = require("../utils/deliveryUrl");
@@ -86,7 +86,7 @@ const applyOrderStatusUpdate = async (order, business, nextStatus) => {
     }
 
     if (nextStatus === "Cancelled" && previousStatus !== "Cancelled") {
-        await restoreStock(order.products);
+        await restoreStockOnce(order);
     }
 
     order.orderStatus = nextStatus;
@@ -413,7 +413,7 @@ const updateReturnStatus = asyncHandler(async (req, res) => {
             });
         }
 
-        await restoreStock(order.products);
+        await restoreStockOnce(order);
         order.returnStatus = "Delivered";
         order.returnDeliveredAt = new Date();
         order.returnResolvedAt = new Date();
@@ -513,7 +513,7 @@ const deleteOrder = asyncHandler(async (req, res) => {
     }
 
     if (order.orderStatus === "Pending" || order.orderStatus === "New") {
-        await restoreStock(order.products);
+        await restoreStockOnce(order);
     }
 
     await order.deleteOne();

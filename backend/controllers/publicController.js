@@ -26,7 +26,9 @@ const {
     isRazorpayConfigured,
     createRazorpayOrder,
     verifyPaymentSignature,
-    getRazorpayCredentials
+    getRazorpayCredentials,
+    fetchRazorpayPayment,
+    amountToPaise
 } = require("../utils/razorpayService");
 const { markOrderPaymentPaid } = require("../utils/markPaymentPaid");
 const {
@@ -415,9 +417,9 @@ const requestPublicReturn = asyncHandler(async (req, res) => {
     }
 
     if (!phonesMatch(order.customerPhone, phone)) {
-        return res.status(403).json({
+        return res.status(404).json({
             success: false,
-            message: "Phone number does not match this order"
+            message: "Order not found"
         });
     }
 
@@ -823,10 +825,37 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
 
     order.razorpayOrderId = razorpay_order_id;
 
-    const { order: paidOrder } = await markOrderPaymentPaid(order, business, {
+    let razorpayPayment;
+
+    try {
+        razorpayPayment = await fetchRazorpayPayment(credentials, razorpay_payment_id);
+    } catch {
+        return res.status(400).json({
+            success: false,
+            message: "Could not verify payment amount"
+        });
+    }
+
+    if (amountToPaise(order.totalAmount) !== Number(razorpayPayment.amount)) {
+        return res.status(400).json({
+            success: false,
+            message: "Payment amount mismatch"
+        });
+    }
+
+    const paymentResult = await markOrderPaymentPaid(order, business, {
         razorpayPaymentId: razorpay_payment_id,
         note: "Payment confirmed via Razorpay"
     });
+
+    if (paymentResult.cancelled) {
+        return res.status(400).json({
+            success: false,
+            message: "This order has been cancelled"
+        });
+    }
+
+    const paidOrder = paymentResult.order;
 
     res.status(200).json({
         success: true,

@@ -12,7 +12,7 @@ export const calculateGstBreakdown = (subtotal, business) => {
         };
     }
 
-    const gstRate = Number(business.gstRate) || 18;
+    const gstRate = business.gstRate != null ? Number(business.gstRate) : 18;
     const gstAmount = roundMoney((normalizedSubtotal * gstRate) / 100);
     const totalAmount = roundMoney(normalizedSubtotal + gstAmount);
 

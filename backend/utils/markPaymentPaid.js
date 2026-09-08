@@ -10,6 +10,10 @@ const markOrderPaymentPaid = async (order, business, { razorpayPaymentId, note =
         return { alreadyPaid: true, order };
     }
 
+    if (order.orderStatus === "Cancelled") {
+        return { alreadyPaid: false, cancelled: true, order };
+    }
+
     order.paymentStatus = "Paid";
     order.paidAt = new Date();
 

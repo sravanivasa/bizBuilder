@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 
 const publicCapabilityLimiter = require("../middleware/publicCapabilityLimiter");
+const publicOrderLimiter = require("../middleware/publicOrderLimiter");
+const publicUploadLimiter = require("../middleware/publicUploadLimiter");
+const { deliveryOtpIpLimiter, deliveryOtpTokenLimiter } = require("../middleware/deliveryOtpLimiter");
 
 const { publicOrderValidation, trackOrderValidation, returnRequestValidation, verifyRazorpayPaymentValidation } = require("../validators/publicValidator");
 const { verifyDeliveryOtpValidation } = require("../validators/deliveryValidator");
@@ -38,21 +41,25 @@ router.get("/orders/track", publicCapabilityLimiter, ...trackOrderValidation, tr
 router.get("/deliver/:deliveryToken", getDeliveryOrder);
 router.post(
     "/deliver/:deliveryToken/photo",
+    publicUploadLimiter,
     deliveryUpload.single("photo"),
     uploadDeliveryPhoto
 );
 router.post(
     "/deliver/:deliveryToken/verify-otp",
+    deliveryOtpIpLimiter,
+    deliveryOtpTokenLimiter,
     ...verifyDeliveryOtpValidation,
     verifyDeliveryOtp
 );
 
 router.get("/businesses/:idOrSlug", getPublicBusiness);
 router.get("/businesses/:idOrSlug/products", getPublicProducts);
-router.post("/businesses/:idOrSlug/orders", ...publicOrderValidation, createPublicOrder);
+router.post("/businesses/:idOrSlug/orders", publicOrderLimiter, ...publicOrderValidation, createPublicOrder);
 router.get("/businesses/:idOrSlug/orders/track", publicCapabilityLimiter, ...trackOrderValidation, trackPublicOrder);
 router.post(
     "/businesses/:idOrSlug/orders/:orderId/return-request",
+    publicUploadLimiter,
     returnUpload.fields([
         { name: "photos", maxCount: 5 },
         { name: "video", maxCount: 1 }

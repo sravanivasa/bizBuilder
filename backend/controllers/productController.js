@@ -71,6 +71,16 @@ const createProduct = asyncHandler(async (req, res) => {
 
 const getProductsByBusiness = asyncHandler(async (req, res) => {
     const { businessId } = req.params;
+    const business = await Business.findById(businessId);
+
+    if (!business) {
+        return res.status(404).json({ success: false, message: "Business not found" });
+    }
+
+    if (business.owner.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
     const products = await Product.find({ business: businessId });
 
     res.status(200).json({ success: true, products });
@@ -81,6 +91,11 @@ const getProductById = asyncHandler(async (req, res) => {
 
     if (!product) {
         return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    const isOwner = await assertBusinessOwner(product, req.user._id, res);
+    if (!isOwner) {
+        return;
     }
 
     res.status(200).json({ success: true, product });
