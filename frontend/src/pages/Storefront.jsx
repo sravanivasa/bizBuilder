@@ -299,7 +299,8 @@ const Storefront = () => {
                 createdAt: data.order.createdAt,
                 orderStatus: data.order.orderStatus,
                 paymentStatus: data.order.paymentStatus,
-                paymentMethod: data.order.paymentMethod
+                paymentMethod: data.order.paymentMethod,
+                trackingToken
             });
 
             if (isOnlinePaymentMethod(data.order.paymentMethod) && data.payUrl) {

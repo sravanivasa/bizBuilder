@@ -306,19 +306,14 @@ const Products = () => {
 
         try {
             if (editingProduct) {
-                const { data } = await updateProduct(editingProduct._id, payload);
-                setProducts((current) =>
-                    current.map((item) =>
-                        item._id === editingProduct._id ? data.product : item
-                    )
-                );
+                await updateProduct(editingProduct._id, payload);
                 setSuccess(t("productUpdateSuccess"));
             } else {
-                const { data } = await createProduct(businessId, payload);
-                setProducts((current) => [data.product, ...current]);
+                await createProduct(businessId, payload);
                 setSuccess(t("productCreateSuccess"));
             }
 
+            await loadProducts(businessId, { page: currentPage, search: appliedSearch });
             closeModal();
         } catch (err) {
             const validationErrors = err.response?.data?.errors;
@@ -342,7 +337,15 @@ const Products = () => {
 
         try {
             await deleteProduct(deleteTarget._id);
-            setProducts((current) => current.filter((item) => item._id !== deleteTarget._id));
+            const nextTotal = Math.max(0, pagination.total - 1);
+            const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PRODUCTS_PER_PAGE));
+            const nextPage = Math.min(currentPage, nextTotalPages);
+
+            if (nextPage !== currentPage) {
+                setCurrentPage(nextPage);
+            }
+
+            await loadProducts(businessId, { page: nextPage, search: appliedSearch });
             setSuccess(t("productDeleteSuccess"));
             setDeleteTarget(null);
         } catch (err) {

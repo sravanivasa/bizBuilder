@@ -50,7 +50,8 @@ const buildOrderFromProducts = async (businessId, products) => {
         orderProducts.push({
             product: product._id,
             quantity: item.quantity,
-            price: product.price
+            price: product.price,
+            productName: product.productName
         });
     }
 

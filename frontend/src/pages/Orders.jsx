@@ -568,7 +568,26 @@ const Orders = () => {
 
         try {
             await deleteOrder(deleteTarget._id);
-            setOrders((current) => current.filter((item) => item._id !== deleteTarget._id));
+            const nextTotal = Math.max(0, pagination.total - 1);
+            const nextTotalPages = Math.max(1, Math.ceil(nextTotal / ORDERS_PER_PAGE));
+            const nextPage = Math.min(currentPage, nextTotalPages);
+
+            if (nextPage !== currentPage) {
+                setCurrentPage(nextPage);
+            }
+
+            if (businessId) {
+                await loadOrders(businessId, {
+                    page: nextPage,
+                    search: appliedSearch,
+                    orderStatus: appliedOrderStatus,
+                    paymentStatus: appliedPaymentStatus,
+                    paymentMethod: appliedPaymentMethod,
+                    dateFrom: appliedDateFrom,
+                    dateTo: appliedDateTo
+                });
+            }
+
             setSuccess(t("orderDeleteSuccess"));
             setDeleteTarget(null);
 

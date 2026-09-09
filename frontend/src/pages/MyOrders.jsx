@@ -38,6 +38,7 @@ const MyOrders = () => {
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshErrors, setRefreshErrors] = useState({});
     const [returnTarget, setReturnTarget] = useState(null);
     const [returnReason, setReturnReason] = useState("");
     const [returnPhotoFiles, setReturnPhotoFiles] = useState([]);
@@ -56,6 +57,7 @@ const MyOrders = () => {
             return;
         }
 
+        const nextRefreshErrors = {};
         const refreshed = await Promise.all(
             stored.map(async (item) => {
                 try {
@@ -71,7 +73,7 @@ const MyOrders = () => {
                     }
                     const order = data.order;
                     const status = order?.orderStatus;
-                    if (status) {
+                    if (order) {
                         updateCustomerOrderFromTrack(item.orderId, order);
                     }
                     return {
@@ -87,14 +89,20 @@ const MyOrders = () => {
                             order?.business?.businessName || item.businessName,
                         businessSlug:
                             order?.business?.slug || item.businessSlug,
-                        businessId: order?.businessId || item.businessId
+                        businessId: order?.businessId || item.businessId,
+                        refreshFailed: false
                     };
                 } catch {
-                    return item;
+                    nextRefreshErrors[item.orderId] = true;
+                    return {
+                        ...item,
+                        refreshFailed: true
+                    };
                 }
             })
         );
 
+        setRefreshErrors(nextRefreshErrors);
         setOrders(refreshed);
         setLoading(false);
     }, [storeSlug]);
@@ -309,6 +317,11 @@ const MyOrders = () => {
                                                 {formatPrice(item.totalAmount)}
                                             </span>
                                         </div>
+                                        {refreshErrors[item.orderId] && (
+                                            <p className="mt-2 text-xs text-amber-200/90">
+                                                {t("myOrdersRefreshFailed")}
+                                            </p>
+                                        )}
                                         {item.returnReason && (
                                             <p className="mt-2 text-xs text-emerald-50/70">
                                                 <span className="text-emerald-100/60">

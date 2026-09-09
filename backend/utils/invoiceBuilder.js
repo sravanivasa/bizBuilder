@@ -20,12 +20,16 @@ const buildInvoiceResponse = async (order) => {
         INVOICE_BUSINESS_FIELDS.join(" ")
     );
 
-    const productIds = order.products.map((item) => item.product);
-    const products = await Product.find({ _id: { $in: productIds } }).select("productName");
+    const missingNameIds = order.products
+        .filter((item) => !item.productName)
+        .map((item) => item.product);
+    const products = missingNameIds.length
+        ? await Product.find({ _id: { $in: missingNameIds } }).select("productName")
+        : [];
     const productMap = new Map(products.map((product) => [String(product._id), product.productName]));
 
     const items = order.products.map((item) => ({
-        productName: productMap.get(String(item.product)) || "Product",
+        productName: item.productName || productMap.get(String(item.product)) || "Product",
         quantity: item.quantity,
         price: item.price,
         lineTotal: roundMoney(item.price * item.quantity)

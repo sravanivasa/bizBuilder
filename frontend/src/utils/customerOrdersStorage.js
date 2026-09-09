@@ -130,7 +130,8 @@ export const saveCustomerOrder = (order) => {
         createdAt: order.createdAt || new Date().toISOString(),
         orderStatus: order.orderStatus || "Pending",
         paymentStatus: order.paymentStatus || "",
-        paymentMethod: order.paymentMethod || ""
+        paymentMethod: order.paymentMethod || "",
+        trackingToken: order.trackingToken || ""
     };
 
     if (entry.businessId && entry.phone) {
@@ -204,7 +205,8 @@ export const updateCustomerOrderFromTrack = (orderId, trackedOrder) => {
                   paymentStatus: trackedOrder.paymentStatus || item.paymentStatus,
                   paymentMethod: trackedOrder.paymentMethod || item.paymentMethod,
                   totalAmount: trackedOrder.totalAmount ?? item.totalAmount,
-                  updatedAt: trackedOrder.updatedAt || item.updatedAt
+                  updatedAt: trackedOrder.updatedAt || item.updatedAt,
+                  trackingToken: item.trackingToken || ""
               }
             : item
     );

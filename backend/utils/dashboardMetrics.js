@@ -30,6 +30,7 @@ const buildTodayOrdersMatch = (businessId, createdAtRange) => ({
     createdAt: createdAtRange
 });
 
+/** Orders literally in lifecycle status Pending (initial status before owner moves them). */
 const buildPendingOrdersMatch = (businessId) => ({
     business: businessId,
     orderStatus: "Pending"

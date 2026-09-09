@@ -1,7 +1,7 @@
 const { body } = require("express-validator");
 const { ALL_ORDER_STATUSES } = require("../utils/orderStatus");
 const { COURIER_OPTIONS } = require("../utils/courierTracking");
-const { PAYMENT_METHODS, PAYMENT_STATUSES } = require("../utils/paymentMethods");
+const { CHECKOUT_PAYMENT_METHODS, PAYMENT_STATUSES } = require("../utils/paymentMethods");
 const { isValidIndianPhone } = require("../utils/phoneValidation");
 
 const createOrderValidation = [
@@ -45,7 +45,7 @@ const createOrderValidation = [
 
     body("paymentMethod")
         .optional()
-        .isIn(PAYMENT_METHODS)
+        .isIn(CHECKOUT_PAYMENT_METHODS)
         .withMessage("Invalid payment method")
 ];
 

@@ -1,5 +1,5 @@
 const { body, query } = require("express-validator");
-const { PAYMENT_METHODS } = require("../utils/paymentMethods");
+const { CHECKOUT_PAYMENT_METHODS } = require("../utils/paymentMethods");
 const { isValidIndianPhone } = require("../utils/phoneValidation");
 
 const CUSTOMER_NAME_MIN = 2;
@@ -52,7 +52,7 @@ const publicOrderValidation = [
     body("paymentMethod")
         .notEmpty()
         .withMessage("Payment method is required")
-        .isIn(PAYMENT_METHODS)
+        .isIn(CHECKOUT_PAYMENT_METHODS)
         .withMessage("Invalid payment method")
 ];
 

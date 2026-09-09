@@ -86,23 +86,30 @@ const findOrderByIdOrShortGlobal = async (orderId, phone) => {
         return null;
     }
 
-    const last10 = normalizePhoneForMatch(phone);
-    if (!last10) {
+    if (!normalizePhoneForMatch(phone)) {
         return null;
     }
 
-    const phoneRegex = new RegExp(`${last10}$`);
-    const candidates = await Order.find({ customerPhone: phoneRegex }).select("_id");
+    const candidates = await Order.find({
+        $expr: {
+            $eq: [
+                {
+                    $toUpper: {
+                        $substr: [
+                            { $toString: "$_id" },
+                            { $subtract: [{ $strLenCP: { $toString: "$_id" } }, 6] },
+                            6
+                        ]
+                    }
+                },
+                normalizedShortId
+            ]
+        }
+    });
 
-    const match = candidates.find(
-        (order) => shortOrderId(order._id) === normalizedShortId
-    );
+    const match = candidates.find((order) => phonesMatch(order.customerPhone, phone));
 
-    if (!match) {
-        return null;
-    }
-
-    return Order.findById(match._id);
+    return match || null;
 };
 
 const isReturnWindowOpen = (order) => {

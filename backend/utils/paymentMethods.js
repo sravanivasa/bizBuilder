@@ -1,5 +1,7 @@
 const PAYMENT_METHODS = ["Cash", "COD", "GPay", "PhonePe", "NetBanking", "UPI", "Card"];
 
+const CHECKOUT_PAYMENT_METHODS = ["Cash", "COD", "GPay", "PhonePe", "NetBanking", "UPI"];
+
 const ONLINE_PAYMENT_METHODS = ["GPay", "PhonePe", "NetBanking", "UPI"];
 
 const COD_PAYMENT_METHODS = ["COD", "Cash"];
@@ -111,6 +113,7 @@ const buildAppPayLink = (paymentMethod, upiLink) => {
 
 module.exports = {
     PAYMENT_METHODS,
+    CHECKOUT_PAYMENT_METHODS,
     ONLINE_PAYMENT_METHODS,
     COD_PAYMENT_METHODS,
     PAYMENT_STATUSES,

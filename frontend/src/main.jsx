@@ -5,11 +5,14 @@ import store from "./store";
 import "./i18n";
 import "./index.css";
 import App from "./App.jsx";
+import AuthBootstrap from "./components/AuthBootstrap.jsx";
 
 createRoot(document.getElementById("root")).render(
     <StrictMode>
         <Provider store={store}>
-            <App />
+            <AuthBootstrap>
+                <App />
+            </AuthBootstrap>
         </Provider>
     </StrictMode>
 );
