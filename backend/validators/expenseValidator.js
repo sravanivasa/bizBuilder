@@ -153,6 +153,12 @@ const listExpensesValidation = [
     optionalDateQueryValidation("from"),
     optionalDateQueryValidation("to"),
 
+    query("search")
+        .optional()
+        .trim()
+        .isLength({ max: 100 })
+        .withMessage("Search query is too long"),
+
     query("active")
         .optional()
         .isIn(["true", "false", "all"])

@@ -11,6 +11,7 @@ const {
     bulkUpdateOrderStatusValidation,
     updatePaymentStatusValidation
 } = require("../validators/orderValidator");
+const { listOrdersValidation } = require("../validators/orderListValidator");
 
 const {
     createOrder,
@@ -32,7 +33,7 @@ router.post(
     ...bulkUpdateOrderStatusValidation,
     bulkUpdateOrderStatus
 );
-router.get("/", authMiddleware, getMyOrders);
+router.get("/", authMiddleware, ...listOrdersValidation, getMyOrders);
 router.get("/:id/invoice", authMiddleware, validateObjectId("id"), getOrderInvoice);
 router.get("/:id", authMiddleware, validateObjectId("id"), getOrderById);
 router.put(

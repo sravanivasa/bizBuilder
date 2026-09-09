@@ -21,9 +21,27 @@
  *       404: { $ref: '#/components/responses/NotFound' }
  * /api/products/business/{businessId}:
  *   get:
- *     summary: Get all products for a business
+ *     summary: List products for a business with optional search and pagination
  *     tags: [Products]
- *     parameters: [{ $ref: '#/components/parameters/BusinessId' }]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/BusinessId'
+ *       - in: query
+ *         name: search
+ *         schema: { type: string, maxLength: 100 }
+ *         description: Case-insensitive search in productName and description
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 12 }
+ *       - in: query
+ *         name: sort
+ *         schema: { type: string, enum: [createdAt, productName, price, stock] }
+ *       - in: query
+ *         name: sortDir
+ *         schema: { type: string, enum: [asc, desc] }
  *     responses:
  *       200:
  *         description: Products fetched successfully

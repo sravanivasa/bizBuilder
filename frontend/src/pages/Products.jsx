@@ -50,8 +50,15 @@ const Products = () => {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const [appliedSearch, setAppliedSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: PRODUCTS_PER_PAGE,
+        total: 0,
+        totalPages: 0
+    });
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -71,38 +78,28 @@ const Products = () => {
     const [csvImportProgress, setCsvImportProgress] = useState({ current: 0, total: 0 });
     const [csvImportResult, setCsvImportResult] = useState(null);
 
-    const loadProducts = useCallback(
-        async (id) => {
-            const { data } = await getProductsByBusiness(id);
-            setProducts(data.products || []);
-        },
-        []
-    );
-
-    const filteredProducts = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-
-        if (!query) {
-            return products;
-        }
-
-        return products.filter((product) => {
-            const name = product.productName?.toLowerCase() ?? "";
-            const description = product.description?.toLowerCase() ?? "";
-            return name.includes(query) || description.includes(query);
+    const loadProducts = useCallback(async (id, { page = 1, search = "" } = {}) => {
+        const { data } = await getProductsByBusiness(id, {
+            page,
+            limit: PRODUCTS_PER_PAGE,
+            search: search || undefined
         });
-    }, [products, searchQuery]);
+        setProducts(data.products || []);
+        setPagination(
+            data.pagination || {
+                page,
+                limit: PRODUCTS_PER_PAGE,
+                total: data.products?.length || 0,
+                totalPages: 1
+            }
+        );
+    }, []);
 
-    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+    const totalPages = Math.max(1, pagination.totalPages || 1);
     const safePage = Math.min(currentPage, totalPages);
     const pageStart =
-        filteredProducts.length === 0 ? 0 : (safePage - 1) * PRODUCTS_PER_PAGE + 1;
-    const pageEnd = Math.min(safePage * PRODUCTS_PER_PAGE, filteredProducts.length);
-
-    const paginatedProducts = useMemo(() => {
-        const start = (safePage - 1) * PRODUCTS_PER_PAGE;
-        return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
-    }, [filteredProducts, safePage]);
+        pagination.total === 0 ? 0 : (safePage - 1) * PRODUCTS_PER_PAGE + 1;
+    const pageEnd = Math.min(safePage * PRODUCTS_PER_PAGE, pagination.total);
 
     const pageNumbers = useMemo(
         () => getPageNumbers(safePage, totalPages),
@@ -125,26 +122,23 @@ const Products = () => {
                 }
 
                 setBusinessId(business._id);
-                await loadProducts(business._id);
+                await loadProducts(business._id, { page: currentPage, search: appliedSearch });
             } catch (err) {
                 setError(err.response?.data?.message || t("productsLoadFailed"));
+                setProducts([]);
             } finally {
                 setLoading(false);
             }
         };
 
         loadPage();
-    }, [loadProducts, t]);
+    }, [loadProducts, currentPage, appliedSearch, t]);
 
-    useEffect(() => {
+    const handleSearchSubmit = (event) => {
+        event.preventDefault();
+        setAppliedSearch(searchInput.trim());
         setCurrentPage(1);
-    }, [searchQuery]);
-
-    useEffect(() => {
-        if (currentPage > totalPages) {
-            setCurrentPage(totalPages);
-        }
-    }, [currentPage, totalPages]);
+    };
 
     const resetImagePreview = () => {
         if (imagePreview.startsWith("blob:")) {
@@ -266,7 +260,7 @@ const Products = () => {
                 onProgress: (current, total) => setCsvImportProgress({ current, total })
             });
             setCsvImportResult(data);
-            await loadProducts(businessId);
+            await loadProducts(businessId, { page: currentPage, search: appliedSearch });
 
             if (data.created > 0) {
                 setSuccess(t("csvImportSummary", { created: data.created, failed: data.failed }));
@@ -698,7 +692,7 @@ const Products = () => {
     };
 
     const renderPagination = () => {
-        if (filteredProducts.length <= PRODUCTS_PER_PAGE) {
+        if (pagination.total <= PRODUCTS_PER_PAGE) {
             return null;
         }
 
@@ -780,19 +774,25 @@ const Products = () => {
                     )}
 
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex-1">
+                        <form onSubmit={handleSearchSubmit} className="flex flex-1 gap-2">
                             <label htmlFor="productSearch" className="sr-only">
                                 {t("productSearchPlaceholder")}
                             </label>
                             <input
                                 id="productSearch"
                                 type="search"
-                                value={searchQuery}
-                                onChange={(event) => setSearchQuery(event.target.value)}
+                                value={searchInput}
+                                onChange={(event) => setSearchInput(event.target.value)}
                                 placeholder={t("productSearchPlaceholder")}
                                 className={inputClassName}
                             />
-                        </div>
+                            <button
+                                type="submit"
+                                className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                            >
+                                {t("search")}
+                            </button>
+                        </form>
                         <div className="flex flex-wrap gap-3">
                             <label className="cursor-pointer rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20">
                                 {t("importCsv")}
@@ -815,33 +815,30 @@ const Products = () => {
 
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-emerald-50/70">
                         <p>
-                            {filteredProducts.length > 0
+                            {pagination.total > 0
                                 ? t("showingProductsRange", {
                                       start: pageStart,
                                       end: pageEnd,
-                                      total: filteredProducts.length
+                                      total: pagination.total
                                   })
-                                : t("productsCount", { count: products.length })}
+                                : t("productsCount", { count: 0 })}
                         </p>
-                        {searchQuery.trim() && filteredProducts.length === 0 && products.length > 0 && (
-                            <p className="text-amber-100/80">{t("productsNoSearchResults")}</p>
-                        )}
                     </div>
 
-                    {products.length === 0 ? (
+                    {pagination.total === 0 ? (
                         <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 text-center">
-                            <p className="text-sm text-emerald-50/80">{t("productsEmpty")}</p>
-                            <button
-                                type="button"
-                                onClick={openAddModal}
-                                className="mt-4 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
-                            >
-                                {t("addFirstProduct")}
-                            </button>
-                        </div>
-                    ) : filteredProducts.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 text-center">
-                            <p className="text-sm text-emerald-50/80">{t("productsNoSearchResults")}</p>
+                            <p className="text-sm text-emerald-50/80">
+                                {appliedSearch ? t("productsNoSearchResults") : t("productsEmpty")}
+                            </p>
+                            {!appliedSearch && (
+                                <button
+                                    type="button"
+                                    onClick={openAddModal}
+                                    className="mt-4 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+                                >
+                                    {t("addFirstProduct")}
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -849,7 +846,7 @@ const Products = () => {
                                 className="max-h-[calc(100vh-18rem)] overflow-y-auto rounded-2xl border border-white/10 p-4 sm:p-5"
                             >
                                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                    {paginatedProducts.map((product) => (
+                                    {products.map((product) => (
                                         <article
                                             key={product._id}
                                             className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"

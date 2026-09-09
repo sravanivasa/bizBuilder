@@ -57,7 +57,8 @@ const buildExpenseFilter = ({
     active = "true",
     category,
     from,
-    to
+    to,
+    search
 }) => {
     const filter = { business: businessId };
 
@@ -81,6 +82,13 @@ const buildExpenseFilter = ({
         if (to) {
             filter.expenseDate.$lte = to;
         }
+    }
+
+    const trimmedSearch = search?.trim();
+
+    if (trimmedSearch) {
+        const { escapeRegex } = require("../utils/phoneValidation");
+        filter.description = { $regex: escapeRegex(trimmedSearch), $options: "i" };
     }
 
     return filter;
@@ -158,7 +166,7 @@ const listExpenses = asyncHandler(async (req, res) => {
         });
     }
 
-    const { businessId, category, from, to, active = "true" } = req.query;
+    const { businessId, category, from, to, active = "true", search } = req.query;
 
     if (from && to && from > to) {
         return res.status(400).json({
@@ -184,7 +192,8 @@ const listExpenses = asyncHandler(async (req, res) => {
         active,
         category,
         from,
-        to
+        to,
+        search
     });
 
     const total = await Expense.countDocuments(filter);

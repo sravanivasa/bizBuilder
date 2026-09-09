@@ -70,6 +70,16 @@ const createProduct = asyncHandler(async (req, res) => {
 });
 
 const getProductsByBusiness = asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: errors.array()
+        });
+    }
+
     const { businessId } = req.params;
     const business = await Business.findById(businessId);
 
@@ -81,9 +91,24 @@ const getProductsByBusiness = asyncHandler(async (req, res) => {
         return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
-    const products = await Product.find({ business: businessId });
+    const { search, sort, sortDir } = req.query;
+    const { parsePagination, buildPaginationMeta } = require("../utils/pagination");
+    const { buildProductListFilter, buildProductListSort } = require("../utils/productListQuery");
 
-    res.status(200).json({ success: true, products });
+    const { page, limit, skip } = parsePagination(req.query, 12);
+    const filter = buildProductListFilter(businessId, search);
+    const sortSpec = buildProductListSort(sort, sortDir);
+
+    const [total, products] = await Promise.all([
+        Product.countDocuments(filter),
+        Product.find(filter).sort(sortSpec).skip(skip).limit(limit)
+    ]);
+
+    res.status(200).json({
+        success: true,
+        products,
+        pagination: buildPaginationMeta(page, limit, total)
+    });
 });
 
 const getProductById = asyncHandler(async (req, res) => {

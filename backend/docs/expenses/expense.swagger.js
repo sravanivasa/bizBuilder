@@ -39,6 +39,10 @@
  *         name: limit
  *         schema: { type: integer, minimum: 1, maximum: 100 }
  *       - in: query
+ *         name: search
+ *         schema: { type: string, maxLength: 100 }
+ *         description: Case-insensitive search in description
+ *       - in: query
  *         name: category
  *         schema: { type: string, enum: [Rent, Utilities, Inventory, Transport, Marketing, Salaries, Misc] }
  *       - in: query

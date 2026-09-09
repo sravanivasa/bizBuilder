@@ -1,6 +1,8 @@
 import api from "./axios";
 
-export const getMyOrders = () => api.get("/orders");
+export const listOrders = (params = {}) => api.get("/orders", { params });
+
+export const getMyOrders = (params = {}) => listOrders(params);
 
 export const getOrderById = (orderId) => api.get(`/orders/${orderId}`);
 

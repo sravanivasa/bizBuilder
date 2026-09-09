@@ -7,6 +7,20 @@ const normalizePhoneForMatch = (phone) => {
     return digits.slice(-10);
 };
 
+const isPhoneSearchInput = (value) => {
+    const trimmed = String(value || "").trim();
+
+    if (!trimmed) {
+        return false;
+    }
+
+    if (!/^[\d\s+\-()]+$/.test(trimmed)) {
+        return false;
+    }
+
+    return trimmed.replace(/\D/g, "").length >= 3;
+};
+
 const phonesMatch = (phoneA, phoneB) => {
     const normalizedA = normalizePhoneForMatch(phoneA);
     const normalizedB = normalizePhoneForMatch(phoneB);
@@ -20,5 +34,6 @@ const phonesMatch = (phoneA, phoneB) => {
 
 module.exports = {
     normalizePhoneForMatch,
-    phonesMatch
+    phonesMatch,
+    isPhoneSearchInput
 };

@@ -58,9 +58,11 @@ const Expenses = () => {
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [summaryError, setSummaryError] = useState("");
 
+    const [searchFilter, setSearchFilter] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("");
     const [fromFilter, setFromFilter] = useState("");
     const [toFilter, setToFilter] = useState("");
+    const [appliedSearch, setAppliedSearch] = useState("");
     const [appliedCategory, setAppliedCategory] = useState("");
     const [appliedFrom, setAppliedFrom] = useState("");
     const [appliedTo, setAppliedTo] = useState("");
@@ -77,10 +79,11 @@ const Expenses = () => {
     const [deactivating, setDeactivating] = useState(false);
 
     const loadExpenses = useCallback(
-        async (id, { page = 1, category = "", from = "", to = "", active = "true" } = {}) => {
+        async (id, { page = 1, search = "", category = "", from = "", to = "", active = "true" } = {}) => {
             const { data } = await listExpenses(id, {
                 page,
                 limit: EXPENSES_PER_PAGE,
+                search: search || undefined,
                 category: category || undefined,
                 from: from || undefined,
                 to: to || undefined,
@@ -137,6 +140,7 @@ const Expenses = () => {
                 await Promise.all([
                     loadExpenses(business._id, {
                         page: currentPage,
+                        search: appliedSearch,
                         category: appliedCategory,
                         from: appliedFrom,
                         to: appliedTo,
@@ -156,6 +160,7 @@ const Expenses = () => {
         loadExpenses,
         loadSummary,
         currentPage,
+        appliedSearch,
         appliedCategory,
         appliedFrom,
         appliedTo,
@@ -165,7 +170,7 @@ const Expenses = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [appliedCategory, appliedFrom, appliedTo, activeFilter]);
+    }, [appliedSearch, appliedCategory, appliedFrom, appliedTo, activeFilter]);
 
     const openCreateModal = () => {
         setEditingExpense(null);
@@ -230,6 +235,7 @@ const Expenses = () => {
             closeModal();
             await loadExpenses(businessId, {
                 page: currentPage,
+                search: appliedSearch,
                 category: appliedCategory,
                 from: appliedFrom,
                 to: appliedTo,
@@ -258,6 +264,7 @@ const Expenses = () => {
             setDeactivateTarget(null);
             await loadExpenses(businessId, {
                 page: currentPage,
+                search: appliedSearch,
                 category: appliedCategory,
                 from: appliedFrom,
                 to: appliedTo,
@@ -273,18 +280,23 @@ const Expenses = () => {
 
     const handleFilterSubmit = (event) => {
         event.preventDefault();
+        setAppliedSearch(searchFilter.trim());
         setAppliedCategory(categoryFilter);
         setAppliedFrom(fromFilter);
         setAppliedTo(toFilter);
+        setCurrentPage(1);
     };
 
     const clearFilters = () => {
+        setSearchFilter("");
         setCategoryFilter("");
         setFromFilter("");
         setToFilter("");
+        setAppliedSearch("");
         setAppliedCategory("");
         setAppliedFrom("");
         setAppliedTo("");
+        setCurrentPage(1);
     };
 
     return (
@@ -345,7 +357,14 @@ const Expenses = () => {
                     </div>
 
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <form onSubmit={handleFilterSubmit} className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        <form onSubmit={handleFilterSubmit} className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                            <input
+                                type="search"
+                                value={searchFilter}
+                                onChange={(e) => setSearchFilter(e.target.value)}
+                                placeholder={t("expensesSearchPlaceholder")}
+                                className={inputClassName}
+                            />
                             <select
                                 value={categoryFilter}
                                 onChange={(e) => setCategoryFilter(e.target.value)}
@@ -414,7 +433,7 @@ const Expenses = () => {
                     ) : expenses.length === 0 ? (
                         <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-10 text-center">
                             <p className="text-sm text-emerald-50/70">
-                                {appliedCategory || appliedFrom || appliedTo
+                                {appliedSearch || appliedCategory || appliedFrom || appliedTo
                                     ? t("expensesFilterEmpty")
                                     : t("expensesEmpty")}
                             </p>

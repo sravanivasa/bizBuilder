@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getMyBusinesses } from "../api/business";
 import {
     deleteOrder,
-    getMyOrders,
+    listOrders,
     updateOrderStatus,
     updateReturnStatus,
     updateOrderDelivery,
@@ -23,7 +23,7 @@ import {
     statusBadgeClass
 } from "../utils/orderStatus";
 import { getOrderAmounts, formatPrice } from "../utils/gstDisplay";
-import { getPaymentLabelKey } from "../constants/paymentMethods";
+import { getPaymentLabelKey, PAYMENT_METHODS, PAYMENT_STATUSES } from "../constants/paymentMethods";
 import { getPaymentStatusLabelKey, paymentStatusBadgeClass, canViewInvoice } from "../utils/paymentStatus";
 import { formatTimeAgo } from "../utils/timeAgo";
 
@@ -70,12 +70,32 @@ const Orders = () => {
     const { t } = useTranslation();
 
     const [hasBusiness, setHasBusiness] = useState(false);
+    const [businessId, setBusinessId] = useState(null);
     const [orders, setOrders] = useState([]);
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: ORDERS_PER_PAGE,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false
+    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const [appliedSearch, setAppliedSearch] = useState("");
+    const [orderStatusFilter, setOrderStatusFilter] = useState("");
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState("");
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
+    const [dateFromFilter, setDateFromFilter] = useState("");
+    const [dateToFilter, setDateToFilter] = useState("");
+    const [appliedOrderStatus, setAppliedOrderStatus] = useState("");
+    const [appliedPaymentStatus, setAppliedPaymentStatus] = useState("");
+    const [appliedPaymentMethod, setAppliedPaymentMethod] = useState("");
+    const [appliedDateFrom, setAppliedDateFrom] = useState("");
+    const [appliedDateTo, setAppliedDateTo] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const [statusDrafts, setStatusDrafts] = useState({});
@@ -125,66 +145,82 @@ const Orders = () => {
         }
     };
 
-    const loadOrders = useCallback(async () => {
-        const { data } = await getMyOrders();
-        const nextOrders = data.orders || [];
-        setOrders(nextOrders);
-
-        const drafts = {};
-        nextOrders.forEach((order) => {
-            drafts[order._id] = order.orderStatus;
-        });
-        setStatusDrafts(drafts);
-
-        const delivery = {};
-        nextOrders.forEach((order) => {
-            delivery[order._id] = {
-                deliveryType: order.deliveryType || "",
-                courierName: order.courierName || "",
-                trackingId: order.trackingId || "",
-                deliveryPersonName: order.deliveryPersonName || "",
-                deliveryPersonPhone: order.deliveryPersonPhone || ""
-            };
-        });
-        setDeliveryDrafts(delivery);
-    }, []);
-
-    const filteredOrders = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-
-        if (!query) {
-            return orders;
-        }
-
-        return orders.filter((order) => {
-            const name = order.customerName?.toLowerCase() ?? "";
-            const phone = order.customerPhone?.toLowerCase() ?? "";
-            const status = order.orderStatus?.toLowerCase() ?? "";
-            const statusLabel = getStatusLabel(order.orderStatus).toLowerCase();
-
-            return (
-                name.includes(query) ||
-                phone.includes(query) ||
-                status.includes(query) ||
-                statusLabel.includes(query)
+    const loadOrders = useCallback(
+        async (
+            id,
+            {
+                page = 1,
+                search = "",
+                orderStatus = "",
+                paymentStatus = "",
+                paymentMethod = "",
+                dateFrom = "",
+                dateTo = ""
+            } = {}
+        ) => {
+            const { data } = await listOrders({
+                businessId: id,
+                page,
+                limit: ORDERS_PER_PAGE,
+                search: search || undefined,
+                orderStatus: orderStatus || undefined,
+                paymentStatus: paymentStatus || undefined,
+                paymentMethod: paymentMethod || undefined,
+                dateFrom: dateFrom || undefined,
+                dateTo: dateTo || undefined
+            });
+            const nextOrders = data.orders || [];
+            setOrders(nextOrders);
+            setPagination(
+                data.pagination || {
+                    page,
+                    limit: ORDERS_PER_PAGE,
+                    total: nextOrders.length,
+                    totalPages: 1,
+                    hasNext: false,
+                    hasPrevious: false
+                }
             );
-        });
-    }, [orders, searchQuery, t]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+            const drafts = {};
+            nextOrders.forEach((order) => {
+                drafts[order._id] = order.orderStatus;
+            });
+            setStatusDrafts(drafts);
+
+            const delivery = {};
+            nextOrders.forEach((order) => {
+                delivery[order._id] = {
+                    deliveryType: order.deliveryType || "",
+                    courierName: order.courierName || "",
+                    trackingId: order.trackingId || "",
+                    deliveryPersonName: order.deliveryPersonName || "",
+                    deliveryPersonPhone: order.deliveryPersonPhone || ""
+                };
+            });
+            setDeliveryDrafts(delivery);
+        },
+        []
+    );
+
+    const totalPages = Math.max(1, pagination.totalPages || 1);
     const safePage = Math.min(currentPage, totalPages);
     const pageStart =
-        filteredOrders.length === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1;
-    const pageEnd = Math.min(safePage * ORDERS_PER_PAGE, filteredOrders.length);
-
-    const paginatedOrders = useMemo(() => {
-        const start = (safePage - 1) * ORDERS_PER_PAGE;
-        return filteredOrders.slice(start, start + ORDERS_PER_PAGE);
-    }, [filteredOrders, safePage]);
+        pagination.total === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1;
+    const pageEnd = Math.min(safePage * ORDERS_PER_PAGE, pagination.total);
 
     const pageNumbers = useMemo(
         () => getPageNumbers(safePage, totalPages),
         [safePage, totalPages]
+    );
+
+    const hasActiveFilters = Boolean(
+        appliedSearch ||
+            appliedOrderStatus ||
+            appliedPaymentStatus ||
+            appliedPaymentMethod ||
+            appliedDateFrom ||
+            appliedDateTo
     );
 
     useEffect(() => {
@@ -198,36 +234,71 @@ const Orders = () => {
 
                 if (!business) {
                     setHasBusiness(false);
+                    setBusinessId(null);
                     setOrders([]);
                     return;
                 }
 
                 setHasBusiness(true);
-                await loadOrders();
+                setBusinessId(business._id);
+                await loadOrders(business._id, {
+                    page: currentPage,
+                    search: appliedSearch,
+                    orderStatus: appliedOrderStatus,
+                    paymentStatus: appliedPaymentStatus,
+                    paymentMethod: appliedPaymentMethod,
+                    dateFrom: appliedDateFrom,
+                    dateTo: appliedDateTo
+                });
             } catch (err) {
                 setError(err.response?.data?.message || t("ordersLoadFailed"));
+                setOrders([]);
             } finally {
                 setLoading(false);
             }
         };
 
         loadPage();
-    }, [loadOrders, t]);
+    }, [
+        loadOrders,
+        currentPage,
+        appliedSearch,
+        appliedOrderStatus,
+        appliedPaymentStatus,
+        appliedPaymentMethod,
+        appliedDateFrom,
+        appliedDateTo,
+        t
+    ]);
 
-    useEffect(() => {
+    const applyFilters = (event) => {
+        event?.preventDefault();
+        setAppliedSearch(searchInput.trim());
+        setAppliedOrderStatus(orderStatusFilter);
+        setAppliedPaymentStatus(paymentStatusFilter);
+        setAppliedPaymentMethod(paymentMethodFilter);
+        setAppliedDateFrom(dateFromFilter);
+        setAppliedDateTo(dateToFilter);
         setCurrentPage(1);
-    }, [searchQuery]);
+    };
 
-    useEffect(() => {
-        if (currentPage > totalPages) {
-            setCurrentPage(totalPages);
-        }
-    }, [currentPage, totalPages]);
+    const clearFilters = () => {
+        setSearchInput("");
+        setOrderStatusFilter("");
+        setPaymentStatusFilter("");
+        setPaymentMethodFilter("");
+        setDateFromFilter("");
+        setDateToFilter("");
+        setAppliedSearch("");
+        setAppliedOrderStatus("");
+        setAppliedPaymentStatus("");
+        setAppliedPaymentMethod("");
+        setAppliedDateFrom("");
+        setAppliedDateTo("");
+        setCurrentPage(1);
+    };
 
-    const pageOrderIds = useMemo(
-        () => paginatedOrders.map((order) => order._id),
-        [paginatedOrders]
-    );
+    const pageOrderIds = useMemo(() => orders.map((order) => order._id), [orders]);
 
     const allPageSelected =
         pageOrderIds.length > 0 && pageOrderIds.every((id) => selectedIds.has(id));
@@ -643,7 +714,7 @@ const Orders = () => {
     };
 
     const renderPagination = () => {
-        if (filteredOrders.length <= ORDERS_PER_PAGE) {
+        if (pagination.total <= ORDERS_PER_PAGE) {
             return null;
         }
 
@@ -1425,45 +1496,109 @@ const Orders = () => {
                         </p>
                     )}
 
-                    <div>
-                        <label htmlFor="orderSearch" className="sr-only">
-                            {t("orderSearchPlaceholder")}
-                        </label>
-                        <input
-                            id="orderSearch"
-                            type="search"
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            placeholder={t("orderSearchPlaceholder")}
-                            className={inputClassName}
-                        />
-                        <p className="mt-2 text-xs text-emerald-50/60">{t("ordersWhatsAppNote")}</p>
-                    </div>
+                    <form onSubmit={applyFilters} className="space-y-4">
+                        <div>
+                            <label htmlFor="orderSearch" className="sr-only">
+                                {t("orderSearchPlaceholder")}
+                            </label>
+                            <input
+                                id="orderSearch"
+                                type="search"
+                                value={searchInput}
+                                onChange={(event) => setSearchInput(event.target.value)}
+                                placeholder={t("orderSearchPlaceholder")}
+                                className={inputClassName}
+                            />
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <select
+                                value={orderStatusFilter}
+                                onChange={(event) => setOrderStatusFilter(event.target.value)}
+                                className={selectClassName}
+                            >
+                                <option value="">{t("ordersFilterAllStatuses")}</option>
+                                {ORDER_STATUSES.map((status) => (
+                                    <option key={status} value={status}>
+                                        {getStatusLabel(status)}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={paymentStatusFilter}
+                                onChange={(event) => setPaymentStatusFilter(event.target.value)}
+                                className={selectClassName}
+                            >
+                                <option value="">{t("ordersFilterAllPaymentStatuses")}</option>
+                                {PAYMENT_STATUSES.map((status) => (
+                                    <option key={status} value={status}>
+                                        {getPaymentStatusLabel(status)}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={paymentMethodFilter}
+                                onChange={(event) => setPaymentMethodFilter(event.target.value)}
+                                className={selectClassName}
+                            >
+                                <option value="">{t("ordersFilterAllPaymentMethods")}</option>
+                                {PAYMENT_METHODS.map((method) => (
+                                    <option key={method} value={method}>
+                                        {getPaymentLabel(method)}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="date"
+                                value={dateFromFilter}
+                                onChange={(event) => setDateFromFilter(event.target.value)}
+                                className={inputClassName}
+                                aria-label={t("ordersFilterDateFrom")}
+                            />
+                            <input
+                                type="date"
+                                value={dateToFilter}
+                                onChange={(event) => setDateToFilter(event.target.value)}
+                                className={inputClassName}
+                                aria-label={t("ordersFilterDateTo")}
+                            />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="submit"
+                                className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-white"
+                            >
+                                {t("applyFilters")}
+                            </button>
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white"
+                                >
+                                    {t("clearFilters")}
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-xs text-emerald-50/60">{t("ordersWhatsAppNote")}</p>
+                    </form>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-emerald-50/70">
                         <p>
-                            {filteredOrders.length > 0
+                            {pagination.total > 0
                                 ? t("showingOrdersRange", {
                                       start: pageStart,
                                       end: pageEnd,
-                                      total: filteredOrders.length
+                                      total: pagination.total
                                   })
-                                : t("ordersCount", { count: orders.length })}
+                                : t("ordersCount", { count: 0 })}
                         </p>
-                        {searchQuery.trim() &&
-                            filteredOrders.length === 0 &&
-                            orders.length > 0 && (
-                                <p className="text-amber-100/80">{t("ordersNoSearchResults")}</p>
-                            )}
                     </div>
 
-                    {orders.length === 0 ? (
+                    {pagination.total === 0 ? (
                         <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 text-center">
-                            <p className="text-sm text-emerald-50/80">{t("ordersEmpty")}</p>
-                        </div>
-                    ) : filteredOrders.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 text-center">
-                            <p className="text-sm text-emerald-50/80">{t("ordersNoSearchResults")}</p>
+                            <p className="text-sm text-emerald-50/80">
+                                {hasActiveFilters ? t("ordersNoSearchResults") : t("ordersEmpty")}
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -1486,7 +1621,7 @@ const Orders = () => {
                                 className="max-h-[calc(100vh-18rem)] overflow-y-auto rounded-2xl border border-white/10 p-4 sm:p-5"
                             >
                                 <div className="space-y-4">
-                                    {paginatedOrders.map((order) => renderOrderCard(order))}
+                                    {orders.map((order) => renderOrderCard(order))}
                                 </div>
                             </div>
                             {renderPagination()}

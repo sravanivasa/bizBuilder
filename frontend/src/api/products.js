@@ -25,7 +25,8 @@ const buildProductFormData = (data, { includeImage = true } = {}) => {
 export const createProduct = (businessId, data) =>
     api.post(`/products/${businessId}`, buildProductFormData(data));
 
-export const getProductsByBusiness = (businessId) => api.get(`/products/business/${businessId}`);
+export const getProductsByBusiness = (businessId, params = {}) =>
+    api.get(`/products/business/${businessId}`, { params });
 
 export const getProductById = (productId) => api.get(`/products/${productId}`);
 

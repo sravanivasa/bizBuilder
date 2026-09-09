@@ -10,6 +10,7 @@ const {
     updateProductValidation,
     bulkCreateProductsValidation
 } = require("../validators/productValidator");
+const { listProductsValidation } = require("../validators/productListValidator");
 
 const {
     createProduct,
@@ -41,6 +42,7 @@ router.get(
     "/business/:businessId",
     authMiddleware,
     validateObjectId("businessId"),
+    ...listProductsValidation,
     getProductsByBusiness
 );
 

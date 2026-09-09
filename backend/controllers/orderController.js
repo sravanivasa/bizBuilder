@@ -193,24 +193,96 @@ const createOrder = asyncHandler(async (req, res) => {
     }
 });
 
-const getMyOrders = asyncHandler(async (req, res) => {
-    const businesses = await Business.find({ owner: req.user._id }).select("_id");
+const resolveOrderListBusiness = async (userId, businessId) => {
+    if (businessId) {
+        const business = await Business.findOne({ _id: businessId, owner: userId });
 
-    if (!businesses.length) {
-        return res.status(200).json({
-            success: true,
-            message: "Orders fetched successfully",
-            orders: []
+        if (!business) {
+            return { error: { status: 403, message: "Forbidden" } };
+        }
+
+        return { business };
+    }
+
+    const business = await Business.findOne({ owner: userId }).sort({ createdAt: 1 });
+
+    if (!business) {
+        return { error: { status: 404, message: "No business found" } };
+    }
+
+    return { business };
+};
+
+const getMyOrders = asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: errors.array()
         });
     }
 
-    const businessIds = businesses.map((business) => business._id);
-    const orders = await Order.find({ business: { $in: businessIds } }).sort({ createdAt: -1 });
+    const {
+        businessId,
+        search,
+        orderStatus,
+        paymentStatus,
+        paymentMethod,
+        dateFrom,
+        dateTo,
+        sort,
+        sortDir
+    } = req.query;
+
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+        return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: [{ msg: "dateFrom must be on or before dateTo" }]
+        });
+    }
+
+    const businessLookup = await resolveOrderListBusiness(req.user._id, businessId);
+
+    if (businessLookup.error) {
+        return res.status(businessLookup.error.status).json({
+            success: false,
+            message: businessLookup.error.message
+        });
+    }
+
+    const { parsePagination, buildPaginationMeta } = require("../utils/pagination");
+    const {
+        buildOrderListFilter,
+        buildOrderListSort,
+        formatOrderForOwnerList
+    } = require("../utils/orderListQuery");
+
+    const { page, limit, skip } = parsePagination(req.query, 12);
+    const filter = buildOrderListFilter({
+        businessId: businessLookup.business._id,
+        search,
+        orderStatus,
+        paymentStatus,
+        paymentMethod,
+        dateFrom,
+        dateTo
+    });
+    const sortSpec = buildOrderListSort(sort, sortDir);
+
+    const [total, orders] = await Promise.all([
+        Order.countDocuments(filter),
+        Order.find(filter).sort(sortSpec).skip(skip).limit(limit)
+    ]);
 
     res.status(200).json({
         success: true,
         message: "Orders fetched successfully",
-        orders: orders.map(attachDeliveryPersonUrl)
+        orders: orders.map(formatOrderForOwnerList),
+        pagination: buildPaginationMeta(page, limit, total),
+        businessId: String(businessLookup.business._id)
     });
 });
 

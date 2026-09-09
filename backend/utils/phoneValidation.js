@@ -1,4 +1,4 @@
-const { normalizePhoneForMatch } = require("./phoneMatch");
+const { normalizePhoneForMatch, isPhoneSearchInput } = require("./phoneMatch");
 
 const normalizeIndianPhone = (value) => String(value || "").replace(/[\s-]/g, "");
 
@@ -34,5 +34,6 @@ module.exports = {
     isValidIndianPhone,
     formatPhoneForStorage,
     normalizePhoneForMatch,
+    isPhoneSearchInput,
     escapeRegex
 };

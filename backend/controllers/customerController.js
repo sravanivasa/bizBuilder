@@ -7,7 +7,8 @@ const pickFields = require("../utils/pickFields");
 const {
     normalizePhoneForMatch,
     formatPhoneForStorage,
-    escapeRegex
+    escapeRegex,
+    isPhoneSearchInput
 } = require("../utils/phoneValidation");
 
 const CUSTOMER_RESPONSE_FIELDS = [
@@ -203,12 +204,21 @@ const listCustomers = asyncHandler(async (req, res) => {
     const trimmedSearch = search?.trim();
 
     if (trimmedSearch) {
-        const normalizedPhone = normalizePhoneForMatch(trimmedSearch);
+        if (trimmedSearch.includes("@")) {
+            filter.email = { $regex: escapeRegex(trimmedSearch), $options: "i" };
+        } else if (isPhoneSearchInput(trimmedSearch)) {
+            const normalizedPhone = normalizePhoneForMatch(trimmedSearch);
 
-        if (normalizedPhone && /^\d+$/.test(normalizedPhone)) {
-            filter.phoneNormalized = normalizedPhone;
+            if (normalizedPhone) {
+                filter.phoneNormalized = {
+                    $regex: `^${escapeRegex(normalizedPhone)}`
+                };
+            }
         } else {
-            filter.name = { $regex: escapeRegex(trimmedSearch), $options: "i" };
+            filter.$or = [
+                { name: { $regex: escapeRegex(trimmedSearch), $options: "i" } },
+                { email: { $regex: escapeRegex(trimmedSearch), $options: "i" } }
+            ];
         }
     }
 
