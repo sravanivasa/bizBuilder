@@ -398,9 +398,21 @@ const Storefront = () => {
                                 id: order._id?.slice(-6).toUpperCase()
                             })}
                         </p>
-                        <p className="mt-4 text-lg font-semibold text-white">
-                            {t("totalAmount")}: {formatPrice(order.totalAmount)}
-                        </p>
+                        <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-emerald-100/70">
+                                {t("storefrontOrderConfirmedTotal")}
+                            </p>
+                            <TotalsBreakdown
+                                amounts={{
+                                    subtotal: order.subtotal ?? order.totalAmount,
+                                    gstAmount: order.gstAmount ?? 0,
+                                    gstRate: order.gstRate ?? 0,
+                                    totalAmount: order.totalAmount
+                                }}
+                                t={t}
+                                compact
+                            />
+                        </div>
                         {capabilityToken && canViewInvoice(order.paymentStatus) && (
                             <Link
                                 to={`/invoice/${capabilityToken}`}

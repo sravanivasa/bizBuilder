@@ -44,10 +44,6 @@ const createBusinessValidation = [
         .trim()
         .isLength({ max: 11 })
         .withMessage("IFSC code must be at most 11 characters"),
-    body("autoConfirmOnlinePayments")
-        .optional()
-        .isBoolean()
-        .withMessage("autoConfirmOnlinePayments must be a boolean"),
     body("razorpayEnabled")
         .optional()
         .isBoolean()
@@ -108,10 +104,6 @@ const updateBusinessValidation = [
         .trim()
         .isLength({ max: 11 })
         .withMessage("IFSC code must be at most 11 characters"),
-    body("autoConfirmOnlinePayments")
-        .optional()
-        .isBoolean()
-        .withMessage("autoConfirmOnlinePayments must be a boolean"),
     body("razorpayEnabled")
         .optional()
         .isBoolean()

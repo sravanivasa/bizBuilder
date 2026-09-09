@@ -311,6 +311,10 @@ const Products = () => {
             } else {
                 await createProduct(businessId, payload);
                 setSuccess(t("productCreateSuccess"));
+                setCurrentPage(1);
+                await loadProducts(businessId, { page: 1, search: appliedSearch });
+                closeModal();
+                return;
             }
 
             await loadProducts(businessId, { page: currentPage, search: appliedSearch });

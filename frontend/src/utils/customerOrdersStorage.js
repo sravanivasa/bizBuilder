@@ -131,7 +131,11 @@ export const saveCustomerOrder = (order) => {
         orderStatus: order.orderStatus || "Pending",
         paymentStatus: order.paymentStatus || "",
         paymentMethod: order.paymentMethod || "",
-        trackingToken: order.trackingToken || ""
+        trackingToken: order.trackingToken || "",
+        returnStatus: order.returnStatus || "None",
+        returnReason: order.returnReason || "",
+        returnPhotos: order.returnPhotos || [],
+        returnVideo: order.returnVideo || null
     };
 
     if (entry.businessId && entry.phone) {
@@ -206,7 +210,30 @@ export const updateCustomerOrderFromTrack = (orderId, trackedOrder) => {
                   paymentMethod: trackedOrder.paymentMethod || item.paymentMethod,
                   totalAmount: trackedOrder.totalAmount ?? item.totalAmount,
                   updatedAt: trackedOrder.updatedAt || item.updatedAt,
-                  trackingToken: item.trackingToken || ""
+                  trackingToken: item.trackingToken || trackedOrder.trackingToken || "",
+                  returnStatus: trackedOrder.returnStatus || item.returnStatus || "None",
+                  returnReason: trackedOrder.returnReason || item.returnReason || "",
+                  returnPhotos: trackedOrder.returnPhotos || item.returnPhotos || [],
+                  returnVideo: trackedOrder.returnVideo ?? item.returnVideo ?? null
+              }
+            : item
+    );
+    writeOrders(orders);
+};
+
+export const updateCustomerOrderReturn = (orderId, returnData) => {
+    if (!returnData) {
+        return;
+    }
+
+    const orders = readOrders().map((item) =>
+        item.orderId === String(orderId)
+            ? {
+                  ...item,
+                  returnStatus: returnData.returnStatus || item.returnStatus || "Requested",
+                  returnReason: returnData.returnReason || item.returnReason || "",
+                  returnPhotos: returnData.returnPhotos || item.returnPhotos || [],
+                  returnVideo: returnData.returnVideo ?? item.returnVideo ?? null
               }
             : item
     );

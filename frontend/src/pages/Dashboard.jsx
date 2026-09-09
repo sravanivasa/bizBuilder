@@ -56,6 +56,7 @@ const Dashboard = () => {
 
     const loadDashboard = useCallback(async () => {
         setLoadState("loading");
+        setBusinessName("");
         setErrorMessage("");
         setNoBusiness(false);
 

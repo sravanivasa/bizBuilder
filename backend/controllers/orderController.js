@@ -114,8 +114,9 @@ const applyOrderStatusUpdate = async (order, business, nextStatus) => {
 };
 
 const sendStatusNotifications = (order, business, nextStatus) => {
-    if (nextStatus === "Confirmed" || nextStatus === "Processing") {
+    if (nextStatus === "Confirmed") {
         notifyCustomerOrderConfirmed(order, business);
+    } else if (nextStatus === "Processing") {
         notifyCustomerOrderProcessing(order, business);
     } else if (nextStatus === "Preparing") {
         notifyCustomerOrderPreparing(order, business);

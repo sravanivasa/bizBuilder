@@ -8,7 +8,8 @@ import {
     getCustomerOrders,
     getStorePath,
     getTrackPath,
-    updateCustomerOrderFromTrack
+    updateCustomerOrderFromTrack,
+    updateCustomerOrderReturn
 } from "../utils/customerOrdersStorage";
 import { canRequestReturn, normalizeReturnStatus, returnBadgeClass, statusBadgeClass } from "../utils/orderStatus";
 import { canViewInvoice } from "../utils/paymentStatus";
@@ -73,10 +74,7 @@ const MyOrders = () => {
                     }
                     const order = data.order;
                     const status = order?.orderStatus;
-                    if (order) {
-                        updateCustomerOrderFromTrack(item.orderId, order);
-                    }
-                    return {
+                    const nextItem = {
                         ...item,
                         orderStatus: status || item.orderStatus,
                         paymentStatus: order?.paymentStatus || item.paymentStatus,
@@ -90,8 +88,13 @@ const MyOrders = () => {
                         businessSlug:
                             order?.business?.slug || item.businessSlug,
                         businessId: order?.businessId || item.businessId,
+                        trackingToken: item.trackingToken || order?.trackingToken || "",
                         refreshFailed: false
                     };
+                    if (order) {
+                        updateCustomerOrderFromTrack(item.orderId, order);
+                    }
+                    return nextItem;
                 } catch {
                     nextRefreshErrors[item.orderId] = true;
                     return {
@@ -183,15 +186,19 @@ const MyOrders = () => {
                 returnTarget.shortOrderId,
                 formData
             );
+            const returnUpdate = {
+                returnStatus: "Requested",
+                returnReason: returnReason.trim(),
+                returnPhotos: data.order?.returnPhotos || [],
+                returnVideo: data.order?.returnVideo || null
+            };
+            updateCustomerOrderReturn(returnTarget.orderId, returnUpdate);
             setOrders((current) =>
                 current.map((item) =>
                     item.orderId === returnTarget.orderId
                         ? {
                               ...item,
-                              returnStatus: "Requested",
-                              returnReason: returnReason.trim(),
-                              returnPhotos: data.order?.returnPhotos || [],
-                              returnVideo: data.order?.returnVideo || null
+                              ...returnUpdate
                           }
                         : item
                 )

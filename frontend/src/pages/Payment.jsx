@@ -137,7 +137,7 @@ const Payment = () => {
                     ondismiss: () => {
                         setCheckoutOpen(false);
                         checkoutOpenedRef.current = false;
-                        setRazorpayError(t("paymentDismissed"));
+                        setRazorpayError("");
                     }
                 }
             }
@@ -175,7 +175,11 @@ const Payment = () => {
             const { data: refreshed } = await getPaymentPage(token);
             setPayment(refreshed.payment);
 
-            if (data.paymentStatus !== "PaymentSubmitted" && refreshed.payment.paymentStatus !== "PaymentSubmitted") {
+            const finalStatus = refreshed.payment.paymentStatus || data.paymentStatus;
+            const isConfirmSuccess =
+                finalStatus === "PaymentSubmitted" || finalStatus === "Paid";
+
+            if (!isConfirmSuccess) {
                 setConfirmError(t("paymentFailed"));
             }
         } catch (err) {

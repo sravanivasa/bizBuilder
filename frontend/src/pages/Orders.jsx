@@ -133,10 +133,8 @@ const Orders = () => {
         setSuccess("");
 
         try {
-            const { data } = await updatePaymentStatus(order._id, "Paid");
-            setOrders((current) =>
-                current.map((item) => (item._id === order._id ? data.order : item))
-            );
+            await updatePaymentStatus(order._id, "Paid");
+            await refetchOrdersList();
             setSuccess(t("paymentStatusUpdateSuccess"));
         } catch (err) {
             setError(err.response?.data?.message || t("paymentStatusUpdateFailed"));
@@ -199,8 +197,56 @@ const Orders = () => {
                 };
             });
             setDeliveryDrafts(delivery);
+
+            return data.pagination || {
+                page,
+                limit: ORDERS_PER_PAGE,
+                total: nextOrders.length,
+                totalPages: 1,
+                hasNext: false,
+                hasPrevious: false
+            };
         },
         []
+    );
+
+    const refetchOrdersList = useCallback(
+        async (pageOverride) => {
+            if (!businessId) {
+                return;
+            }
+
+            const filterParams = {
+                search: appliedSearch,
+                orderStatus: appliedOrderStatus,
+                paymentStatus: appliedPaymentStatus,
+                paymentMethod: appliedPaymentMethod,
+                dateFrom: appliedDateFrom,
+                dateTo: appliedDateTo
+            };
+            let page = pageOverride ?? currentPage;
+            const paginationResult = await loadOrders(businessId, { page, ...filterParams });
+            const totalPages = Math.max(1, paginationResult?.totalPages || 1);
+
+            if (page > totalPages) {
+                page = totalPages;
+                if (page !== currentPage) {
+                    setCurrentPage(page);
+                }
+                await loadOrders(businessId, { page, ...filterParams });
+            }
+        },
+        [
+            businessId,
+            currentPage,
+            appliedSearch,
+            appliedOrderStatus,
+            appliedPaymentStatus,
+            appliedPaymentMethod,
+            appliedDateFrom,
+            appliedDateTo,
+            loadOrders
+        ]
     );
 
     const totalPages = Math.max(1, pagination.totalPages || 1);
@@ -338,23 +384,11 @@ const Orders = () => {
 
     const clearSelection = () => setSelectedIds(new Set());
 
-    const applyBulkUpdates = (updatedOrders) => {
-        const updatedMap = new Map(updatedOrders.map((order) => [order._id, order]));
-
-        setOrders((current) =>
-            current.map((item) => updatedMap.get(item._id) || item)
-        );
-
-        setStatusDrafts((current) => {
-            const next = { ...current };
-            updatedOrders.forEach((order) => {
-                next[order._id] = order.orderStatus;
-            });
-            return next;
-        });
-    };
-
-    const handleBulkStatus = async (orderStatus, orderIds = [...selectedIds]) => {
+    const handleBulkStatus = async (
+        orderStatus,
+        orderIds = [...selectedIds],
+        clientSkippedCount = 0
+    ) => {
         if (!orderIds.length) {
             return;
         }
@@ -365,10 +399,11 @@ const Orders = () => {
 
         try {
             const { data } = await bulkUpdateOrderStatus(orderIds, orderStatus);
-            applyBulkUpdates(data.orders || []);
+            await refetchOrdersList();
 
             const updatedCount = data.updatedCount ?? data.orders?.length ?? 0;
-            const skippedCount = data.skippedCount ?? data.skipped?.length ?? 0;
+            const serverSkippedCount = data.skippedCount ?? data.skipped?.length ?? 0;
+            const skippedCount = serverSkippedCount + clientSkippedCount;
 
             if (updatedCount > 0) {
                 setSuccess(
@@ -412,11 +447,7 @@ const Orders = () => {
             return;
         }
 
-        if (skippedCount > 0) {
-            setSuccess(t("bulkShippedSkipped", { count: skippedCount }));
-        }
-
-        handleBulkStatus("Shipped", eligibleIds);
+        handleBulkStatus("Shipped", eligibleIds, skippedCount);
     };
 
     const handleBulkCancel = () => handleBulkStatus("Cancelled");
@@ -437,10 +468,8 @@ const Orders = () => {
         setSuccess("");
 
         try {
-            const { data } = await updateOrderStatus(order._id, draft);
-            setOrders((current) =>
-                current.map((item) => (item._id === order._id ? data.order : item))
-            );
+            await updateOrderStatus(order._id, draft);
+            await refetchOrdersList();
             setSuccess(t("orderStatusUpdateSuccess"));
         } catch (err) {
             setError(err.response?.data?.message || t("orderStatusUpdateFailed"));
@@ -463,10 +492,8 @@ const Orders = () => {
         try {
             const requestPayload =
                 typeof payload === "string" ? { returnStatus: payload } : payload;
-            const { data } = await updateReturnStatus(order._id, requestPayload);
-            setOrders((current) =>
-                current.map((item) => (item._id === order._id ? data.order : item))
-            );
+            await updateReturnStatus(order._id, requestPayload);
+            await refetchOrdersList();
             if (returnStatus === "Delivered") {
                 setSuccess(t("returnReceivedSuccess"));
             } else if (returnStatus === "Shipped") {
@@ -525,14 +552,8 @@ const Orders = () => {
                 ...options
             };
 
-            const { data } = await updateOrderDelivery(order._id, payload);
-            setOrders((current) =>
-                current.map((item) => (item._id === order._id ? data.order : item))
-            );
-            setStatusDrafts((current) => ({
-                ...current,
-                [order._id]: data.order.orderStatus
-            }));
+            await updateOrderDelivery(order._id, payload);
+            await refetchOrdersList();
             setSuccess(t("deliveryUpdateSuccess"));
         } catch (err) {
             setError(err.response?.data?.message || t("deliveryUpdateFailed"));

@@ -26,7 +26,6 @@ const BUSINESS_FIELDS = [
     "bankName",
     "bankAccountNumber",
     "bankIfsc",
-    "autoConfirmOnlinePayments",
     "razorpayEnabled",
     "razorpayKeyId"
 ];
@@ -35,6 +34,7 @@ const formatBusinessForOwner = (business) => {
     const plain = business.toObject ? business.toObject() : { ...business };
     plain.hasRazorpaySecret = Boolean(plain.razorpayKeySecret);
     delete plain.razorpayKeySecret;
+    delete plain.autoConfirmOnlinePayments;
 
     if (plain.hasRazorpaySecret) {
         plain.razorpayKeySecret = RAZORPAY_SECRET_MASK;

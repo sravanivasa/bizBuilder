@@ -128,7 +128,7 @@ const buildTrackedOrderResponse = async (order) => {
     const productMap = new Map(products.map((product) => [String(product._id), product.productName]));
 
     const items = order.products.map((item) => ({
-        productName: productMap.get(String(item.product)) || "Product",
+        productName: item.productName || productMap.get(String(item.product)) || "Product",
         quantity: item.quantity,
         price: item.price,
         lineTotal: item.price * item.quantity
@@ -138,6 +138,7 @@ const buildTrackedOrderResponse = async (order) => {
         orderId: order._id,
         shortOrderId: shortOrderId(order._id),
         businessId: String(order.business),
+        trackingToken: order.trackingToken || null,
         orderStatus: order.orderStatus,
         returnStatus: normalizeReturnStatus(order.returnStatus),
         returnReason: order.returnReason || null,

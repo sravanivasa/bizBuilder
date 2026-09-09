@@ -8,7 +8,6 @@ const { decrementStock, restoreStock } = require("./orderInventory");
 const {
     notifyOwnerNewOrder,
     notifyCustomerOrderPlaced,
-    notifyCustomerOrderConfirmed,
     notifyCustomerPaymentPending
 } = require("../services/whatsappService");
 const {
@@ -115,7 +114,6 @@ const createOrderForBusiness = async ({
 
         if (isCodPaymentMethod(paymentMethod)) {
             notifyCustomerOrderPlaced(order, business);
-            notifyCustomerOrderConfirmed(order, business);
         } else if (isOnlinePaymentMethod(paymentMethod)) {
             notifyCustomerPaymentPending(order, business);
         } else {

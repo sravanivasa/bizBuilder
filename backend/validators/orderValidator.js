@@ -29,7 +29,9 @@ const createOrderValidation = [
     body("customerAddress")
         .trim()
         .notEmpty()
-        .withMessage("Customer address is required"),
+        .withMessage("Customer address is required")
+        .isLength({ min: 10 })
+        .withMessage("Customer address must be at least 10 characters"),
 
     body("products")
         .isArray({ min: 1 })
