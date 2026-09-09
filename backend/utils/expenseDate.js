@@ -53,6 +53,29 @@ const shiftExpenseDate = (dateString, dayOffset) => {
     return `${y}-${m}-${d}`;
 };
 
+/**
+ * UTC Date range for Order.createdAt queries aligned to an IST calendar day.
+ * Uses half-open interval [start, end) in UTC.
+ */
+const getIstDayCreatedAtRange = (dateString) => {
+    const start = new Date(`${dateString}T00:00:00+05:30`);
+    const nextDay = shiftExpenseDate(dateString, 1);
+    const endExclusive = new Date(`${nextDay}T00:00:00+05:30`);
+
+    return { $gte: start, $lt: endExclusive };
+};
+
+/**
+ * UTC Date range for Order.createdAt queries aligned to IST calendar month boundaries.
+ */
+const getIstMonthCreatedAtRange = (monthStart, monthEnd) => {
+    const start = new Date(`${monthStart}T00:00:00+05:30`);
+    const nextDay = shiftExpenseDate(monthEnd, 1);
+    const endExclusive = new Date(`${nextDay}T00:00:00+05:30`);
+
+    return { $gte: start, $lt: endExclusive };
+};
+
 module.exports = {
     BUSINESS_TIMEZONE,
     DATE_ONLY_PATTERN,
@@ -60,5 +83,7 @@ module.exports = {
     getTodayInBusinessTimezone,
     getMonthRangeInBusinessTimezone,
     isValidExpenseDateString,
-    shiftExpenseDate
+    shiftExpenseDate,
+    getIstDayCreatedAtRange,
+    getIstMonthCreatedAtRange
 };

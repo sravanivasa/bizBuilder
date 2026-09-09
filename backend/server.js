@@ -22,6 +22,7 @@ const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 const publicRoutes = require("./routes/publicRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
 const errorHandler = require("./middleware/errorMiddleware");
@@ -86,6 +87,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/expenses", expenseRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
