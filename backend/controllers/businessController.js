@@ -6,6 +6,7 @@ const asyncHandler = require("../middleware/asyncHandler");
 const pickFields = require("../utils/pickFields");
 const { generateSlug, ensureUniqueSlug } = require("../utils/generateSlug");
 const { ensureBusinessSlug } = require("../utils/resolveBusiness");
+const { findBusinessForOwner } = require("../utils/tenantAuthorization");
 
 const RAZORPAY_SECRET_MASK = "••••••••";
 
@@ -91,26 +92,21 @@ const getMyBusinesses = asyncHandler(async (req, res) => {
 });
 
 const getBusinessById = asyncHandler(async (req, res) => {
-    const business = await Business.findById(req.params.id).select("+razorpayKeySecret");
+    const { business, error } = await findBusinessForOwner(req.params.id, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({
+    if (error) {
+        return res.status(error.status).json({
             success: false,
-            message: "Business not found"
+            message: error.message
         });
     }
 
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
-        });
-    }
+    const businessWithSecrets = await Business.findById(business._id).select("+razorpayKeySecret");
 
     res.status(200).json({
         success: true,
         message: "Business fetched successfully",
-        business: formatBusinessForOwner(business)
+        business: formatBusinessForOwner(businessWithSecrets)
     });
 });
 
@@ -124,19 +120,12 @@ const updateBusiness = asyncHandler(async (req, res) => {
         });
     }
 
-    const business = await Business.findById(req.params.id);
+    const { business, error } = await findBusinessForOwner(req.params.id, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({
+    if (error) {
+        return res.status(error.status).json({
             success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
+            message: error.message
         });
     }
 
@@ -158,7 +147,7 @@ const updateBusiness = asyncHandler(async (req, res) => {
         updates.slug = await ensureUniqueSlug(Business, baseSlug, business._id);
     }
 
-    const updatedBusiness = await Business.findByIdAndUpdate(req.params.id, updates, {
+    const updatedBusiness = await Business.findByIdAndUpdate(business._id, updates, {
         new: true,
         runValidators: true
     }).select("+razorpayKeySecret");
@@ -171,19 +160,12 @@ const updateBusiness = asyncHandler(async (req, res) => {
 });
 
 const deleteBusiness = asyncHandler(async (req, res) => {
-    const business = await Business.findById(req.params.id);
+    const { business, error } = await findBusinessForOwner(req.params.id, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({
+    if (error) {
+        return res.status(error.status).json({
             success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
+            message: error.message
         });
     }
 

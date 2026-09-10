@@ -47,9 +47,9 @@ const markOrderPaymentPaid = async (order, business, { razorpayPaymentId, note =
     }
 
     if (updated.orderStatus === "Pending" || updated.orderStatus === "New") {
-        updated.orderStatus = "Confirmed";
+        updated.orderStatus = "Processing";
         appendDeliveryTimeline(updated, {
-            status: "Confirmed",
+            status: "Processing",
             note
         });
         await updated.save();

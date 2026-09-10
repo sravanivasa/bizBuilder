@@ -28,6 +28,11 @@ const {
     notifyDeliveryPersonLink,
     notifyCustomerCourierTracking
 } = require("../services/whatsappService");
+const {
+    ensureOwnerOrder,
+    findBusinessForOwner,
+    resolveOwnerBusiness
+} = require("../utils/tenantAuthorization");
 
 const DELETABLE_ORDER_STATUSES = ["Pending", "New", "Cancelled"];
 
@@ -40,26 +45,6 @@ const attachDeliveryPersonUrl = (order) => {
     delete plain.deliveryOtp;
     plain.deliveryPersonUrl = buildDeliveryPersonUrl(order);
     return plain;
-};
-
-const ensureOwnerOrder = async (orderId, userId) => {
-    const order = await Order.findById(orderId);
-
-    if (!order) {
-        return { error: { status: 404, message: "Order not found" } };
-    }
-
-    const business = await Business.findById(order.business);
-
-    if (!business) {
-        return { error: { status: 404, message: "Business not found" } };
-    }
-
-    if (business.owner.toString() !== userId.toString()) {
-        return { error: { status: 403, message: "Forbidden" } };
-    }
-
-    return { order, business };
 };
 
 const issueDeliveryOtp = (order) => {
@@ -152,19 +137,12 @@ const createOrder = asyncHandler(async (req, res) => {
         paymentMethod = "Cash"
     } = req.body;
 
-    const business = await Business.findById(businessId);
+    const { business, error } = await findBusinessForOwner(businessId, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({
+    if (error) {
+        return res.status(error.status).json({
             success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
+            message: error.message
         });
     }
 
@@ -194,25 +172,7 @@ const createOrder = asyncHandler(async (req, res) => {
     }
 });
 
-const resolveOrderListBusiness = async (userId, businessId) => {
-    if (businessId) {
-        const business = await Business.findOne({ _id: businessId, owner: userId });
-
-        if (!business) {
-            return { error: { status: 403, message: "Forbidden" } };
-        }
-
-        return { business };
-    }
-
-    const business = await Business.findOne({ owner: userId }).sort({ createdAt: 1 });
-
-    if (!business) {
-        return { error: { status: 404, message: "No business found" } };
-    }
-
-    return { business };
-};
+const resolveOrderListBusiness = (userId, businessId) => resolveOwnerBusiness(userId, businessId);
 
 const getMyOrders = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
@@ -288,29 +248,18 @@ const getMyOrders = asyncHandler(async (req, res) => {
 });
 
 const getOrderById = asyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).select("-trackingToken -deliveryToken -deliveryOtp");
+    const ownerContext = await ensureOwnerOrder(req.params.id, req.user._id);
 
-    if (!order) {
-        return res.status(404).json({
+    if (ownerContext.error) {
+        return res.status(ownerContext.error.status).json({
             success: false,
-            message: "Order not found"
+            message: ownerContext.error.message
         });
     }
 
-    const business = await Business.findById(order.business);
-    if (!business) {
-        return res.status(404).json({
-            success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
-        });
-    }
+    const order = await Order.findById(ownerContext.order._id).select(
+        "-trackingToken -deliveryToken -deliveryOtp"
+    );
 
     res.status(200).json({
         success: true,
@@ -329,29 +278,16 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
         });
     }
 
-    const order = await Order.findById(req.params.id);
+    const ownerContext = await ensureOwnerOrder(req.params.id, req.user._id);
 
-    if (!order) {
-        return res.status(404).json({
+    if (ownerContext.error) {
+        return res.status(ownerContext.error.status).json({
             success: false,
-            message: "Order not found"
+            message: ownerContext.error.message
         });
     }
 
-    const business = await Business.findById(order.business);
-    if (!business) {
-        return res.status(404).json({
-            success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
-        });
-    }
+    const { order, business } = ownerContext;
 
     if (TERMINAL_ORDER_STATUSES.includes(order.orderStatus)) {
         return res.status(400).json({
@@ -466,30 +402,16 @@ const updateReturnStatus = asyncHandler(async (req, res) => {
         });
     }
 
-    const order = await Order.findById(req.params.id);
+    const ownerContext = await ensureOwnerOrder(req.params.id, req.user._id);
 
-    if (!order) {
-        return res.status(404).json({
+    if (ownerContext.error) {
+        return res.status(ownerContext.error.status).json({
             success: false,
-            message: "Order not found"
+            message: ownerContext.error.message
         });
     }
 
-    const business = await Business.findById(order.business);
-    if (!business) {
-        return res.status(404).json({
-            success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
-        });
-    }
-
+    const { order, business } = ownerContext;
     const { returnStatus, returnTrackingId, returnCourier } = req.body;
     const currentReturnStatus = normalizeReturnStatus(order.returnStatus);
 
@@ -569,29 +491,16 @@ const updateReturnStatus = asyncHandler(async (req, res) => {
 });
 
 const deleteOrder = asyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id);
+    const ownerContext = await ensureOwnerOrder(req.params.id, req.user._id);
 
-    if (!order) {
-        return res.status(404).json({
+    if (ownerContext.error) {
+        return res.status(ownerContext.error.status).json({
             success: false,
-            message: "Order not found"
+            message: ownerContext.error.message
         });
     }
 
-    const business = await Business.findById(order.business);
-    if (!business) {
-        return res.status(404).json({
-            success: false,
-            message: "Business not found"
-        });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-            success: false,
-            message: "Forbidden"
-        });
-    }
+    const { order } = ownerContext;
 
     if (!DELETABLE_ORDER_STATUSES.includes(order.orderStatus)) {
         return res.status(400).json({

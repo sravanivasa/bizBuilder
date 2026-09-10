@@ -21,7 +21,7 @@ const { getOrderStatusTransitionError } = require("../utils/orderLifecycle");
 const { isInvoiceAvailable } = require("../utils/paymentMethods");
 
 const order = (overrides = {}) => ({
-    orderStatus: "Pending",
+    orderStatus: "New",
     paymentMethod: "UPI",
     paymentStatus: "AwaitingPayment",
     ...overrides
@@ -30,7 +30,7 @@ const order = (overrides = {}) => ({
 // --- H1 Paid cancellation ---
 (() => {
     const err = getOrderStatusTransitionError(
-        order({ paymentStatus: "Paid", orderStatus: "Confirmed" }),
+        order({ paymentStatus: "Paid", orderStatus: "Processing" }),
         "Cancelled"
     );
     if (err === "Paid orders cannot be cancelled. Use the refund process first.") {
@@ -43,7 +43,7 @@ const order = (overrides = {}) => ({
 // --- PaymentSubmitted cancellation preserved ---
 (() => {
     const err = getOrderStatusTransitionError(
-        order({ paymentStatus: "PaymentSubmitted", orderStatus: "Confirmed" }),
+        order({ paymentStatus: "PaymentSubmitted", orderStatus: "Processing" }),
         "Cancelled"
     );
     if (err === null) {
@@ -64,7 +64,7 @@ const order = (overrides = {}) => ({
         "Delivered"
     );
     const directJump = getOrderStatusTransitionError(
-        order({ paymentStatus: "AwaitingPayment", orderStatus: "Pending" }),
+        order({ paymentStatus: "AwaitingPayment", orderStatus: "New" }),
         "Delivered"
     );
     if (
@@ -198,13 +198,13 @@ const order = (overrides = {}) => ({
 // --- New → Processing (bulk path) ---
 (() => {
     const err = getOrderStatusTransitionError(
-        order({ orderStatus: "Pending", paymentMethod: "COD", paymentStatus: "COD" }),
+        order({ orderStatus: "New", paymentMethod: "COD", paymentStatus: "COD" }),
         "Processing"
     );
     if (err === null) {
-        pass("F bulk Processing from Pending allowed");
+        pass("F bulk Processing from New allowed");
     } else {
-        fail("F bulk Processing from Pending allowed", err);
+        fail("F bulk Processing from New allowed", err);
     }
 })();
 

@@ -107,6 +107,7 @@ const createOrderForBusiness = async ({
             totalAmount,
             paymentMethod,
             paymentStatus: getInitialPaymentStatus(paymentMethod),
+            orderStatus: "New",
             trackingToken: generateTrackingToken()
         });
 

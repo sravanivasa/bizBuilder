@@ -14,6 +14,7 @@ import {
 import PageShell from "../components/PageShell";
 import {
     ORDER_STATUSES,
+    OWNER_SELECTABLE_STATUSES,
     TERMINAL_STATUSES,
     DELETABLE_STATUSES,
     COURIER_OPTIONS,
@@ -1329,7 +1330,7 @@ const Orders = () => {
                                     }
                                     className={selectClassName}
                                 >
-                                    {ORDER_STATUSES.map((status) => (
+                                    {OWNER_SELECTABLE_STATUSES.map((status) => (
                                         <option
                                             key={status}
                                             value={status}

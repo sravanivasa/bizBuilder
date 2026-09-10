@@ -81,8 +81,9 @@
  *           default: Pending
  *         orderStatus:
  *           type: string
- *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
- *           default: Pending
+ *           enum: [New, Processing, Shipped, OutForDelivery, Delivered, Cancelled, Pending, Confirmed, Preparing, Completed]
+ *           default: New
+ *           description: Canonical lifecycle statuses are New, Processing, Shipped, OutForDelivery, Delivered, and Cancelled. Legacy values (Pending, Confirmed, Preparing, Completed) are normalized during the Stage 1 transition.
  *         returnStatus:
  *           type: string
  *           enum: [None, Requested, Accepted, Shipped, Delivered, Rejected]
@@ -154,8 +155,8 @@
  *       properties:
  *         orderStatus:
  *           type: string
- *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
- *           example: Confirmed
+ *           enum: [New, Processing, Shipped, OutForDelivery, Delivered, Cancelled]
+ *           example: Processing
  *     OrderReturnStatusUpdateInput:
  *       type: object
  *       required: [returnStatus]

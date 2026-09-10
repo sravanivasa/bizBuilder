@@ -10,6 +10,10 @@ const {
     escapeRegex,
     isPhoneSearchInput
 } = require("../utils/phoneValidation");
+const {
+    ensureBusinessOwner,
+    findResourceForOwner
+} = require("../utils/tenantAuthorization");
 
 const CUSTOMER_RESPONSE_FIELDS = [
     "_id",
@@ -27,30 +31,19 @@ const CUSTOMER_RESPONSE_FIELDS = [
 const formatCustomer = (customer) =>
     pickFields(customer.toObject ? customer.toObject() : customer, CUSTOMER_RESPONSE_FIELDS);
 
-const ensureBusinessOwner = async (businessId, userId) => {
-    const business = await Business.findOne({ _id: businessId, owner: userId });
-
-    if (!business) {
-        return null;
-    }
-
-    return business;
-};
-
 const findCustomerForOwner = async (customerId, userId) => {
-    const customer = await Customer.findById(customerId);
+    const result = await findResourceForOwner(
+        Customer,
+        customerId,
+        userId,
+        "Customer not found"
+    );
 
-    if (!customer) {
-        return { error: { status: 404, message: "Customer not found" } };
+    if (result.error) {
+        return result;
     }
 
-    const business = await ensureBusinessOwner(customer.business, userId);
-
-    if (!business) {
-        return { error: { status: 403, message: "Forbidden" } };
-    }
-
-    return { customer, business };
+    return { customer: result.resource, business: result.business };
 };
 
 const buildCustomerStats = async (businessId, customerId) => {

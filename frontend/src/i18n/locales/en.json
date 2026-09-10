@@ -50,7 +50,7 @@
   "statTodayRevenue": "Today's sales",
   "statMonthRevenue": "This month sales",
   "statProducts": "Products",
-  "statPending": "Orders in Pending status",
+  "statPending": "New orders awaiting action",
   "myOrdersRefreshFailed": "Unable to refresh this order. Showing last saved details.",
   "statTodayExpenses": "Today's expenses",
   "statMonthExpenses": "This month expenses",

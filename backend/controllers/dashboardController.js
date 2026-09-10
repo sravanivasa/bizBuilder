@@ -1,4 +1,3 @@
-const Business = require("../models/Business");
 const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
 const { ensureBusinessSlug } = require("../utils/resolveBusiness");
@@ -18,24 +17,7 @@ const {
     countOrders,
     aggregateExpenseTotal
 } = require("../utils/dashboardMetrics");
-
-const ensureBusinessOwner = async (businessId, userId) => {
-    const business = await Business.findOne({ _id: businessId, owner: userId });
-
-    if (!business) {
-        return null;
-    }
-
-    return business;
-};
-
-const resolveDashboardBusiness = async (userId, businessId) => {
-    if (businessId) {
-        return ensureBusinessOwner(businessId, userId);
-    }
-
-    return Business.findOne({ owner: userId }).sort({ createdAt: 1 });
-};
+const { resolveOwnerBusiness } = require("../utils/tenantAuthorization");
 
 const getDashboardSummary = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
@@ -49,16 +31,16 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
     }
 
     const { businessId } = req.query;
-    const business = await resolveDashboardBusiness(req.user._id, businessId);
+    const resolved = await resolveOwnerBusiness(req.user._id, businessId);
 
-    if (!business) {
-        const status = businessId ? 403 : 404;
-
-        return res.status(status).json({
+    if (resolved.error) {
+        return res.status(resolved.error.status).json({
             success: false,
-            message: businessId ? "Forbidden" : "No business found"
+            message: resolved.error.message
         });
     }
+
+    const business = resolved.business;
 
     const businessWithSlug = await ensureBusinessSlug(business);
     const businessObjectId = businessWithSlug._id;

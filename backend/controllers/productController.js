@@ -1,35 +1,16 @@
 const Product = require("../models/Product");
-const Business = require("../models/Business");
 const { validationResult } = require("express-validator");
 const asyncHandler = require("../middleware/asyncHandler");
 const pickFields = require("../utils/pickFields");
+const {
+    findBusinessForOwner,
+    assertProductOwner
+} = require("../utils/tenantAuthorization");
 
 const PRODUCT_FIELDS = ["productName", "description", "price", "stock", "image"];
 
 const DEFAULT_PRODUCT_IMAGE =
     "https://placehold.co/600x400/e2e8f0/64748b?text=Product";
-
-const assertBusinessOwner = async (product, userId, res) => {
-    const business = await Business.findById(product.business);
-
-    if (!business) {
-        res.status(404).json({
-            success: false,
-            message: "Business not found"
-        });
-        return false;
-    }
-
-    if (business.owner.toString() !== userId.toString()) {
-        res.status(403).json({
-            success: false,
-            message: "Forbidden"
-        });
-        return false;
-    }
-
-    return true;
-};
 
 const createProduct = asyncHandler(async (req, res) => {
     const errors = validationResult(req);
@@ -42,14 +23,10 @@ const createProduct = asyncHandler(async (req, res) => {
     }
 
     const { businessId } = req.params;
-    const business = await Business.findById(businessId);
+    const { business, error } = await findBusinessForOwner(businessId, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({ success: false, message: "Business not found" });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
+    if (error) {
+        return res.status(error.status).json({ success: false, message: error.message });
     }
 
     if (!req.file) {
@@ -81,14 +58,10 @@ const getProductsByBusiness = asyncHandler(async (req, res) => {
     }
 
     const { businessId } = req.params;
-    const business = await Business.findById(businessId);
+    const { business, error } = await findBusinessForOwner(businessId, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({ success: false, message: "Business not found" });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
+    if (error) {
+        return res.status(error.status).json({ success: false, message: error.message });
     }
 
     const { search, sort, sortDir } = req.query;
@@ -118,9 +91,13 @@ const getProductById = asyncHandler(async (req, res) => {
         return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    const isOwner = await assertBusinessOwner(product, req.user._id, res);
-    if (!isOwner) {
-        return;
+    const ownerCheck = await assertProductOwner(product, req.user._id);
+
+    if (ownerCheck.error) {
+        return res.status(ownerCheck.error.status).json({
+            success: false,
+            message: ownerCheck.error.message
+        });
     }
 
     res.status(200).json({ success: true, product });
@@ -141,9 +118,13 @@ const updateProduct = asyncHandler(async (req, res) => {
         return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    const isOwner = await assertBusinessOwner(product, req.user._id, res);
-    if (!isOwner) {
-        return;
+    const ownerCheck = await assertProductOwner(product, req.user._id);
+
+    if (ownerCheck.error) {
+        return res.status(ownerCheck.error.status).json({
+            success: false,
+            message: ownerCheck.error.message
+        });
     }
 
     const updateData = pickFields(req.body, PRODUCT_FIELDS);
@@ -174,14 +155,10 @@ const bulkCreateProducts = asyncHandler(async (req, res) => {
     }
 
     const { businessId } = req.params;
-    const business = await Business.findById(businessId);
+    const { business, error } = await findBusinessForOwner(businessId, req.user._id);
 
-    if (!business) {
-        return res.status(404).json({ success: false, message: "Business not found" });
-    }
-
-    if (business.owner.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
+    if (error) {
+        return res.status(error.status).json({ success: false, message: error.message });
     }
 
     const products = req.body.products;
@@ -248,9 +225,13 @@ const deleteProduct = asyncHandler(async (req, res) => {
         return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    const isOwner = await assertBusinessOwner(product, req.user._id, res);
-    if (!isOwner) {
-        return;
+    const ownerCheck = await assertProductOwner(product, req.user._id);
+
+    if (ownerCheck.error) {
+        return res.status(ownerCheck.error.status).json({
+            success: false,
+            message: ownerCheck.error.message
+        });
     }
 
     await Product.findByIdAndDelete(req.params.productId);

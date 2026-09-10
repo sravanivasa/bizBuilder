@@ -75,6 +75,11 @@ const findOrderByIdOrShort = async (businessId, orderId) => {
     return Order.findById(match._id);
 };
 
+/**
+ * Global phone+short-order-id lookup across all businesses.
+ * Stage 1 note: medium-risk cross-tenant enumeration surface — preserved for
+ * backward-compatible customer tracking; deprecate in a future deliberate ADR.
+ */
 const findOrderByIdOrShortGlobal = async (orderId, phone) => {
     const normalizedShortId = String(orderId).trim().toUpperCase();
 

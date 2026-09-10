@@ -10,6 +10,10 @@ const {
     getMonthRangeInBusinessTimezone
 } = require("../utils/expenseDate");
 const { parseExpenseAmount } = require("../validators/expenseValidator");
+const {
+    ensureBusinessOwner,
+    findResourceForOwner
+} = require("../utils/tenantAuthorization");
 
 const EXPENSE_RESPONSE_FIELDS = [
     "_id",
@@ -26,30 +30,19 @@ const EXPENSE_RESPONSE_FIELDS = [
 const formatExpense = (expense) =>
     pickFields(expense.toObject ? expense.toObject() : expense, EXPENSE_RESPONSE_FIELDS);
 
-const ensureBusinessOwner = async (businessId, userId) => {
-    const business = await Business.findOne({ _id: businessId, owner: userId });
-
-    if (!business) {
-        return null;
-    }
-
-    return business;
-};
-
 const findExpenseForOwner = async (expenseId, userId) => {
-    const expense = await Expense.findById(expenseId);
+    const result = await findResourceForOwner(
+        Expense,
+        expenseId,
+        userId,
+        "Expense not found"
+    );
 
-    if (!expense) {
-        return { error: { status: 404, message: "Expense not found" } };
+    if (result.error) {
+        return result;
     }
 
-    const business = await ensureBusinessOwner(expense.business, userId);
-
-    if (!business) {
-        return { error: { status: 403, message: "Forbidden" } };
-    }
-
-    return { expense, business };
+    return { expense: result.resource, business: result.business };
 };
 
 const buildExpenseFilter = ({

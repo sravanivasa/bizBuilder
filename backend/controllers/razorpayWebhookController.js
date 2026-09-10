@@ -7,6 +7,7 @@ const {
     amountToPaise
 } = require("../utils/razorpayService");
 const { markOrderPaymentPaid } = require("../utils/markPaymentPaid");
+const { logInfo } = require("../utils/logger");
 
 const handleRazorpayWebhook = asyncHandler(async (req, res) => {
     const signature = req.headers["x-razorpay-signature"];
@@ -63,12 +64,22 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
     }
 
     if (order.paymentStatus === "Paid") {
-        console.info(`Razorpay webhook: order ${order._id} already paid, ignoring duplicate`);
+        logInfo("Razorpay webhook duplicate payment ignored", {
+            requestId: req.requestId,
+            event: "razorpay.webhook",
+            orderId: String(order._id),
+            razorpayOrderId: payment.order_id
+        });
         return res.status(200).json({ success: true, message: "Already paid" });
     }
 
     if (order.orderStatus === "Cancelled") {
-        console.info(`Razorpay webhook: order ${order._id} is cancelled, ignoring payment`);
+        logInfo("Razorpay webhook cancelled order ignored", {
+            requestId: req.requestId,
+            event: "razorpay.webhook",
+            orderId: String(order._id),
+            razorpayOrderId: payment.order_id
+        });
         return res.status(200).json({ success: true, message: "Cancelled order ignored" });
     }
 
@@ -94,6 +105,14 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
     if (result.cancelled) {
         return res.status(200).json({ success: true, message: "Cancelled order ignored" });
     }
+
+    logInfo("Razorpay webhook payment processed", {
+        requestId: req.requestId,
+        event: "razorpay.webhook",
+        orderId: String(result.order?._id || order._id),
+        razorpayOrderId: payment.order_id,
+        alreadyPaid: result.alreadyPaid
+    });
 
     res.status(200).json({ success: true, message: "Payment processed" });
 });

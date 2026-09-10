@@ -87,7 +87,7 @@
  *         shortOrderId: { type: string, example: ABC123 }
  *         orderStatus:
  *           type: string
- *           enum: [Pending, Confirmed, Preparing, Completed, Cancelled, Delivered]
+ *           enum: [New, Processing, Shipped, OutForDelivery, Delivered, Cancelled, Pending, Confirmed, Preparing, Completed]
  *         returnStatus:
  *           type: string
  *           enum: [None, Requested, Accepted, Shipped, Delivered, Rejected]

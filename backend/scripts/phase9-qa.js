@@ -76,7 +76,7 @@ const buildOrderFixture = ({
     totalAmount,
     paymentStatus,
     paymentMethod,
-    orderStatus = "Confirmed",
+    orderStatus = "Processing",
     createdAt
 }) => ({
     business: businessId,
@@ -138,11 +138,24 @@ const run = async () => {
         process.exit(failed ? 1 : 0);
     }
 
-    const product = await Product.findOne({ business: business._id });
+    let product = await Product.findOne({ business: business._id, stock: { $gt: 0 } });
+
     if (!product) {
-        console.log("SKIP  order fixtures — no product");
-        await mongoose.disconnect();
-        process.exit(failed ? 1 : 0);
+        const fallback = await Product.findOne({ business: business._id });
+
+        if (fallback) {
+            await Product.findByIdAndUpdate(fallback._id, { $set: { stock: 10 } });
+            product = await Product.findById(fallback._id);
+        } else {
+            product = await Product.create({
+                business: business._id,
+                productName: `QA Bootstrap Product ${Date.now()}`,
+                description: "Phase 9 bootstrap",
+                price: 100,
+                stock: 10,
+                image: "https://placehold.co/100"
+            });
+        }
     }
 
     const owner = await User.findById(business.owner);
@@ -204,19 +217,19 @@ const run = async () => {
     const baselineTodayOrders = await countOrders(buildTodayOrdersMatch(business._id, dayRange));
     const baselinePendingOrders = await countOrders({
         business: business._id,
-        orderStatus: "Pending"
+        orderStatus: "New"
     });
 
     const revenueFixtures = [
         { label: "Paid", totalAmount: 100, paymentStatus: "Paid", paymentMethod: "GPay", orderStatus: "Delivered", counts: true },
-        { label: "COD", totalAmount: 200, paymentStatus: "COD", paymentMethod: "COD", orderStatus: "Pending", counts: true },
-        { label: "AwaitingPayment", totalAmount: 300, paymentStatus: "AwaitingPayment", paymentMethod: "GPay", orderStatus: "Pending", counts: false },
-        { label: "PaymentSubmitted", totalAmount: 400, paymentStatus: "PaymentSubmitted", paymentMethod: "GPay", orderStatus: "Pending", counts: false },
-        { label: "Pending", totalAmount: 500, paymentStatus: "Pending", paymentMethod: "Card", orderStatus: "Pending", counts: false },
-        { label: "Failed", totalAmount: 600, paymentStatus: "Failed", paymentMethod: "GPay", orderStatus: "Pending", counts: false },
+        { label: "COD", totalAmount: 200, paymentStatus: "COD", paymentMethod: "COD", orderStatus: "New", counts: true },
+        { label: "AwaitingPayment", totalAmount: 300, paymentStatus: "AwaitingPayment", paymentMethod: "GPay", orderStatus: "New", counts: false },
+        { label: "PaymentSubmitted", totalAmount: 400, paymentStatus: "PaymentSubmitted", paymentMethod: "GPay", orderStatus: "New", counts: false },
+        { label: "Pending", totalAmount: 500, paymentStatus: "Pending", paymentMethod: "Card", orderStatus: "New", counts: false },
+        { label: "Failed", totalAmount: 600, paymentStatus: "Failed", paymentMethod: "GPay", orderStatus: "New", counts: false },
         { label: "CancelledPaid", totalAmount: 700, paymentStatus: "Paid", paymentMethod: "GPay", orderStatus: "Cancelled", counts: false },
         { label: "CancelledCOD", totalAmount: 800, paymentStatus: "COD", paymentMethod: "Cash", orderStatus: "Cancelled", counts: false },
-        { label: "CompletedPaid", totalAmount: 90, paymentStatus: "Paid", paymentMethod: "UPI", orderStatus: "Completed", counts: true },
+        { label: "CompletedPaid", totalAmount: 90, paymentStatus: "Paid", paymentMethod: "UPI", orderStatus: "Delivered", counts: true },
         { label: "DeliveredPaid", totalAmount: 10, paymentStatus: "Paid", paymentMethod: "NetBanking", orderStatus: "Delivered", counts: true }
     ];
 
@@ -241,7 +254,7 @@ const run = async () => {
             totalAmount: 50,
             paymentStatus: "Paid",
             paymentMethod: "GPay",
-            orderStatus: "Confirmed",
+            orderStatus: "Processing",
             createdAt: new Date(`${yesterday}T12:00:00+05:30`)
         })
     );
@@ -284,13 +297,13 @@ const run = async () => {
     }
 
     const pendingDelta =
-        (await countOrders({ business: business._id, orderStatus: "Pending" })) - baselinePendingOrders;
-    const expectedPendingDelta = revenueFixtures.filter((f) => f.orderStatus === "Pending").length;
+        (await countOrders({ business: business._id, orderStatus: "New" })) - baselinePendingOrders;
+    const expectedPendingDelta = revenueFixtures.filter((f) => f.orderStatus === "New").length;
 
     if (pendingDelta === expectedPendingDelta) {
-        pass("Pending orders lifecycle count", `+${expectedPendingDelta}`);
+        pass("New orders lifecycle count", `+${expectedPendingDelta}`);
     } else {
-        fail("Pending orders lifecycle count", `expected delta ${expectedPendingDelta}, got ${pendingDelta}`);
+        fail("New orders lifecycle count", `expected delta ${expectedPendingDelta}, got ${pendingDelta}`);
     }
 
     const yesterdayRevenue = await aggregateOrderRevenue(

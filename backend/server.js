@@ -15,6 +15,7 @@ const { validateEnv } = require("./config/env");
 
 const connectDB = require("./config/db");
 const sanitizeInput = require("./middleware/sanitizeInput");
+const requestIdMiddleware = require("./middleware/requestId");
 
 const userRoutes = require("./routes/userRoutes");
 const businessRoutes = require("./routes/businessRoutes");
@@ -53,6 +54,7 @@ if (trustProxySetting === "1" || trustProxySetting === "true") {
 }
 
 app.use(helmet());
+app.use(requestIdMiddleware);
 app.use(limiter);
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(

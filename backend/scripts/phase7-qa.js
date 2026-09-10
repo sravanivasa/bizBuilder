@@ -55,7 +55,25 @@ const run = async () => {
         process.exit(failed ? 1 : 0);
     }
 
-    const product = await Product.findOne({ business: business._id, stock: { $gte: 2 } });
+    let product = await Product.findOne({ business: business._id, stock: { $gte: 2 } });
+
+    if (!product) {
+        const fallback = await Product.findOne({ business: business._id });
+
+        if (fallback) {
+            await Product.findByIdAndUpdate(fallback._id, { $set: { stock: 10 } });
+            product = await Product.findById(fallback._id);
+        } else {
+            product = await Product.create({
+                business: business._id,
+                productName: `QA Bootstrap Product ${Date.now()}`,
+                description: "Phase 7 bootstrap",
+                price: 100,
+                stock: 10,
+                image: "https://placehold.co/100"
+            });
+        }
+    }
     const suffix = String(Date.now()).slice(-4);
     const phoneA = `987654${suffix}`;
     const phoneB = `987653${suffix}`;

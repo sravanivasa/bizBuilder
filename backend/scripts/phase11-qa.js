@@ -178,7 +178,7 @@ const run = async () => {
         totalAmount: qaProduct.price,
         paymentMethod: "COD",
         paymentStatus: "COD",
-        orderStatus: "Pending",
+        orderStatus: "New",
         trackingToken: makeTrackingToken()
     });
 
@@ -213,7 +213,7 @@ const run = async () => {
         totalAmount: 100,
         paymentMethod: "COD",
         paymentStatus: "COD",
-        orderStatus: "Pending",
+        orderStatus: "New",
         trackingToken: makeTrackingToken()
     });
     const legacyInvoice = await buildInvoiceResponse(legacyOrder);
@@ -265,7 +265,7 @@ const run = async () => {
         totalAmount: 50,
         paymentMethod: "COD",
         paymentStatus: "COD",
-        orderStatus: "Pending",
+        orderStatus: "New",
         trackingToken: makeTrackingToken()
     });
     const shortId = shortOrderId(trackOrder._id);
@@ -301,10 +301,10 @@ const run = async () => {
     }
 
     const pendingMatch = buildPendingOrdersMatch(business._id);
-    if (pendingMatch.orderStatus === "Pending") {
-        pass("Dashboard pending uses Pending status only");
+    if (pendingMatch.orderStatus === "New") {
+        pass("Dashboard pending uses New status only");
     } else {
-        fail("Dashboard pending uses Pending status only");
+        fail("Dashboard pending uses New status only");
     }
 
     const dashboard = await request("GET", `/dashboard/summary?businessId=${business._id}`, null, token);
@@ -362,7 +362,7 @@ const run = async () => {
     }
 
     const deletable = listBefore.body.orders?.[0];
-    if (deletable && ["Pending", "Cancelled"].includes(deletable.orderStatus)) {
+    if (deletable && ["New", "Cancelled"].includes(deletable.orderStatus)) {
         await request("DELETE", `/orders/${deletable._id}`, null, token);
         const listAfter = await request(
             "GET",

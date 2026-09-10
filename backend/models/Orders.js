@@ -117,7 +117,7 @@ const orderSchema = new mongoose.Schema(
                 "Preparing",
                 "Completed"
             ],
-            default: "Pending"
+            default: "New"
         },
 
         deliveryType: {

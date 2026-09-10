@@ -1,5 +1,13 @@
+const { logError } = require("../utils/logger");
+
 const errorHandler = (err, req, res, next) => {
-    console.error(err.stack);
+    logError(err.message || "Unhandled error", {
+        requestId: req.requestId,
+        event: "http.error",
+        stack: process.env.NODE_ENV === "production" ? undefined : err.stack,
+        path: req.path,
+        method: req.method
+    });
 
     if (err.name === "CastError") {
         return res.status(400).json({

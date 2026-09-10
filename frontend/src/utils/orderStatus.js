@@ -1,15 +1,19 @@
-export const ORDER_STATUSES = [
+export const CANONICAL_ORDER_STATUSES = [
     "New",
     "Processing",
     "Shipped",
     "OutForDelivery",
     "Delivered",
-    "Cancelled",
-    "Pending",
-    "Confirmed",
-    "Preparing",
-    "Completed"
+    "Cancelled"
 ];
+
+/** Legacy statuses kept for filters/display of pre-migration data. */
+export const LEGACY_ORDER_STATUSES = ["Pending", "Confirmed", "Preparing", "Completed"];
+
+export const ORDER_STATUSES = [...CANONICAL_ORDER_STATUSES, ...LEGACY_ORDER_STATUSES];
+
+/** Statuses owners can select when updating an order. */
+export const OWNER_SELECTABLE_STATUSES = CANONICAL_ORDER_STATUSES;
 
 export const TERMINAL_STATUSES = ["Delivered", "Cancelled", "Completed"];
 

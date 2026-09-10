@@ -14,7 +14,7 @@
  *       Return/refund-adjusted revenue is deferred until a complete refund workflow exists.
  *
  *       **Today's orders:** orders created today (Asia/Kolkata calendar) excluding Cancelled.
- *       **Pending orders:** orderStatus === Pending (lifecycle metric, not payment pending).
+ *       **Pending orders:** orderStatus === New (lifecycle metric for orders awaiting owner action; not payment pending).
  *
  *       **Expenses:** active expenses (isActive true) by expenseDate on Asia/Kolkata calendar.
  *       **Profit:** realized revenue minus active expenses for the same period and business.

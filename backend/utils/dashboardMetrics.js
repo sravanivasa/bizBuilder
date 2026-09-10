@@ -30,10 +30,10 @@ const buildTodayOrdersMatch = (businessId, createdAtRange) => ({
     createdAt: createdAtRange
 });
 
-/** Orders literally in lifecycle status Pending (initial status before owner moves them). */
+/** Orders in lifecycle status New (awaiting owner action; formerly Pending). */
 const buildPendingOrdersMatch = (businessId) => ({
     business: businessId,
-    orderStatus: "Pending"
+    orderStatus: "New"
 });
 
 const aggregateOrderRevenue = async (match) => {
