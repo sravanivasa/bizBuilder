@@ -119,7 +119,7 @@ const isReturnWindowOpen = (order) => {
     return new Date() <= windowEnd;
 };
 
-const buildTrackedOrderResponse = async (order) => {
+const buildTrackedOrderResponse = async (order, { includeTrackingToken = false } = {}) => {
     const business = await Business.findById(order.business).select(PUBLIC_BUSINESS_FIELDS.join(" "));
 
     const productIds = order.products.map((item) => item.product);
@@ -138,7 +138,6 @@ const buildTrackedOrderResponse = async (order) => {
         orderId: order._id,
         shortOrderId: shortOrderId(order._id),
         businessId: String(order.business),
-        trackingToken: order.trackingToken || null,
         orderStatus: order.orderStatus,
         returnStatus: normalizeReturnStatus(order.returnStatus),
         returnReason: order.returnReason || null,
@@ -171,6 +170,10 @@ const buildTrackedOrderResponse = async (order) => {
             ? pickFields(business.toObject(), PUBLIC_BUSINESS_FIELDS)
             : { businessName: "Shop" }
     };
+
+    if (includeTrackingToken) {
+        response.trackingToken = order.trackingToken || null;
+    }
 
     return response;
 };
@@ -336,7 +339,7 @@ const trackPublicOrderGlobal = asyncHandler(async (req, res) => {
         });
     }
 
-    const trackedOrder = await buildTrackedOrderResponse(order);
+    const trackedOrder = await buildTrackedOrderResponse(order, { includeTrackingToken: true });
 
     res.status(200).json({
         success: true,
@@ -383,7 +386,7 @@ const trackPublicOrder = asyncHandler(async (req, res) => {
         });
     }
 
-    const trackedOrder = await buildTrackedOrderResponse(order);
+    const trackedOrder = await buildTrackedOrderResponse(order, { includeTrackingToken: true });
 
     res.status(200).json({
         success: true,

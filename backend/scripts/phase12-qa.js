@@ -146,7 +146,10 @@ const run = async () => {
         fail("P12-02 Tracking prefers productName snapshot");
     }
 
-    if (publicControllerSource.includes("trackingToken: order.trackingToken")) {
+    if (
+        publicControllerSource.includes("includeTrackingToken") &&
+        publicControllerSource.includes("response.trackingToken = order.trackingToken")
+    ) {
         pass("P12-08 Track response includes trackingToken after verification");
     } else {
         fail("P12-08 Track response includes trackingToken after verification");
