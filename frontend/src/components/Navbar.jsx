@@ -24,6 +24,7 @@ const Navbar = () => {
     const navItems = [
         { to: "/", label: t("dashboard") },
         { to: "/business", label: t("business") },
+        { to: "/business/settings", label: t("businessSettingsNav") },
         { to: "/products", label: t("products") },
         { to: "/orders", label: t("orders") },
         { to: "/customers", label: t("customers") },

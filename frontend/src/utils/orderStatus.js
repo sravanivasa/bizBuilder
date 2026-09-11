@@ -88,9 +88,32 @@ export const returnBadgeClass = (status) => {
     }
 };
 
-export const RETURN_WINDOW_DAYS = 30;
+/** Legacy fallback for orders created before Stage 2 return-policy snapshots. */
+export const LEGACY_RETURN_WINDOW_DAYS = 30;
+
+const getReturnPolicy = (order) => {
+    if (order?.returnPolicy) {
+        return order.returnPolicy;
+    }
+
+    if (order?.returnPolicySnapshot) {
+        return order.returnPolicySnapshot;
+    }
+
+    return {
+        enabled: true,
+        windowDays: LEGACY_RETURN_WINDOW_DAYS,
+        legacy: true
+    };
+};
 
 export const isReturnWindowOpen = (order) => {
+    const policy = getReturnPolicy(order);
+
+    if (!policy.enabled) {
+        return false;
+    }
+
     const referenceDate = order?.updatedAt || order?.createdAt;
 
     if (!referenceDate) {
@@ -98,12 +121,22 @@ export const isReturnWindowOpen = (order) => {
     }
 
     const windowEnd = new Date(referenceDate);
-    windowEnd.setDate(windowEnd.getDate() + RETURN_WINDOW_DAYS);
+    windowEnd.setDate(windowEnd.getDate() + Number(policy.windowDays));
     return new Date() <= windowEnd;
 };
 
-export const canRequestReturn = (order) =>
-    order &&
-    ["Delivered", "Completed"].includes(order.orderStatus) &&
-    (!order.returnStatus || order.returnStatus === "None") &&
-    isReturnWindowOpen(order);
+export const canRequestReturn = (order) => {
+    if (order?.canRequestReturn != null) {
+        return Boolean(order.canRequestReturn);
+    }
+
+    const policy = getReturnPolicy(order);
+
+    return (
+        order &&
+        ["Delivered", "Completed"].includes(order.orderStatus) &&
+        (!order.returnStatus || order.returnStatus === "None") &&
+        policy.enabled &&
+        isReturnWindowOpen(order)
+    );
+};

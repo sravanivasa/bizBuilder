@@ -16,9 +16,27 @@ const {
     updateBusiness,
     deleteBusiness
 } = require("../controllers/businessController");
+const {
+    getBusinessSettings,
+    updateBusinessSettings
+} = require("../controllers/businessSettingsController");
+const { updateBusinessSettingsValidation } = require("../validators/businessSettingsValidator");
 
 router.post("/", authMiddleware, ...createBusinessValidation, createBusiness);
 router.get("/my-businesses", authMiddleware, getMyBusinesses);
+router.get(
+    "/:businessId/settings",
+    authMiddleware,
+    validateObjectId("businessId"),
+    getBusinessSettings
+);
+router.put(
+    "/:businessId/settings",
+    authMiddleware,
+    validateObjectId("businessId"),
+    ...updateBusinessSettingsValidation,
+    updateBusinessSettings
+);
 router.get("/:id", authMiddleware, validateObjectId("id"), getBusinessById);
 router.put(
     "/:id",

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { createBusiness, getMyBusinesses, updateBusiness } from "../api/business";
 import { BUSINESS_CATEGORIES } from "../constants/businessCategories";
@@ -243,6 +244,14 @@ const BusinessSetup = () => {
                         <p className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
                             {success}
                         </p>
+                    )}
+
+                    {businessId && (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                            <Link to="/business/settings" className="text-sm font-medium text-emerald-200 hover:text-white">
+                                {t("businessSettingsOpenLink")}
+                            </Link>
+                        </div>
                     )}
 
                     {!isEditing && businessId && (

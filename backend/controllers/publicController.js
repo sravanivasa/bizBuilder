@@ -32,6 +32,15 @@ const {
 } = require("../utils/razorpayService");
 const { markOrderPaymentPaid } = require("../utils/markPaymentPaid");
 const {
+    resolveBusinessGstConfig,
+    getPublicReturnsSummary
+} = require("../utils/businessSettings");
+const {
+    canRequestReturn,
+    getReturnPolicyForOrder,
+    isReturnWindowOpen
+} = require("../utils/returnPolicy");
+const {
     isConfigured: isWhatsAppConfigured,
     notifyCustomerOrderConfirmed,
     notifyCustomerOrderPreparing,
@@ -50,9 +59,6 @@ const PUBLIC_BUSINESS_FIELDS = [
     "gstEnabled",
     "gstRate"
 ];
-
-const RETURN_ELIGIBLE_STATUSES = ["Delivered", "Completed"];
-const RETURN_WINDOW_DAYS = 30;
 
 const shortOrderId = (orderId) => String(orderId).slice(-6).toUpperCase();
 
@@ -117,13 +123,6 @@ const findOrderByIdOrShortGlobal = async (orderId, phone) => {
     return match || null;
 };
 
-const isReturnWindowOpen = (order) => {
-    const referenceDate = order.updatedAt || order.createdAt;
-    const windowEnd = new Date(referenceDate);
-    windowEnd.setDate(windowEnd.getDate() + RETURN_WINDOW_DAYS);
-    return new Date() <= windowEnd;
-};
-
 const buildTrackedOrderResponse = async (order, { includeTrackingToken = false } = {}) => {
     const business = await Business.findById(order.business).select(PUBLIC_BUSINESS_FIELDS.join(" "));
 
@@ -171,6 +170,8 @@ const buildTrackedOrderResponse = async (order, { includeTrackingToken = false }
         trackingUrl: order.trackingUrl || null,
         deliveryPhoto: order.deliveryPhoto || null,
         deliveryTimeline: order.deliveryTimeline || [],
+        returnPolicy: getReturnPolicyForOrder(order),
+        canRequestReturn: canRequestReturn(order),
         business: business
             ? pickFields(business.toObject(), PUBLIC_BUSINESS_FIELDS)
             : { businessName: "Shop" }
@@ -209,12 +210,18 @@ const getPublicBusiness = asyncHandler(async (req, res) => {
         });
     }
 
+    const gstConfig = await resolveBusinessGstConfig(business._id);
+    const returns = await getPublicReturnsSummary(business._id);
+
     res.status(200).json({
         success: true,
         message: "Business fetched successfully",
         business: {
             _id: business._id,
-            ...pickFields(business.toObject(), PUBLIC_BUSINESS_FIELDS)
+            ...pickFields(business.toObject(), PUBLIC_BUSINESS_FIELDS),
+            gstEnabled: gstConfig.gstEnabled,
+            gstRate: gstConfig.gstRate,
+            returns
         }
     });
 });
@@ -439,17 +446,26 @@ const requestPublicReturn = asyncHandler(async (req, res) => {
         });
     }
 
-    if (!RETURN_ELIGIBLE_STATUSES.includes(order.orderStatus)) {
+    if (!canRequestReturn(order)) {
+        const policy = getReturnPolicyForOrder(order);
+
+        if (!policy.enabled) {
+            return res.status(400).json({
+                success: false,
+                message: "Returns are not available for this order"
+            });
+        }
+
+        if (!isReturnWindowOpen(order, policy)) {
+            return res.status(400).json({
+                success: false,
+                message: `Return window has closed (${policy.windowDays} days)`
+            });
+        }
+
         return res.status(400).json({
             success: false,
             message: "Returns are only available for delivered or completed orders"
-        });
-    }
-
-    if (!isReturnWindowOpen(order)) {
-        return res.status(400).json({
-            success: false,
-            message: `Return window has closed (${RETURN_WINDOW_DAYS} days)`
         });
     }
 

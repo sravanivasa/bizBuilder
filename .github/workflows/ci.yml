@@ -75,6 +75,10 @@ jobs:
           echo "Server failed to start"
           exit 1
 
+      - name: Stage 2 settings QA
+        working-directory: backend
+        run: MONGODB_URI="$MONGODB_URI_TEST" node scripts/stage2-settings-qa.js
+
       - name: Stage 1 tenant isolation QA
         working-directory: backend
         run: MONGODB_URI="$MONGODB_URI_TEST" node scripts/stage1-tenant-qa.js

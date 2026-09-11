@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import BusinessSetup from "./pages/BusinessSetup";
+import BusinessSettingsPage from "./pages/BusinessSettings";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
@@ -48,6 +49,7 @@ const App = () => {
                     <Route element={<Layout />}>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/business" element={<BusinessSetup />} />
+                        <Route path="/business/settings" element={<BusinessSettingsPage />} />
                         <Route path="/products" element={<Products />} />
                         <Route path="/orders" element={<Orders />} />
                         <Route path="/customers" element={<Customers />} />

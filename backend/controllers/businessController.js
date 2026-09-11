@@ -1,4 +1,5 @@
 const Business = require("../models/Business");
+const BusinessSettings = require("../models/BusinessSettings");
 const Product = require("../models/Product");
 const Order = require("../models/Orders");
 const { validationResult } = require("express-validator");
@@ -7,6 +8,10 @@ const pickFields = require("../utils/pickFields");
 const { generateSlug, ensureUniqueSlug } = require("../utils/generateSlug");
 const { ensureBusinessSlug } = require("../utils/resolveBusiness");
 const { findBusinessForOwner } = require("../utils/tenantAuthorization");
+const {
+    ensureBusinessSettings,
+    syncSettingsGstFromBusiness
+} = require("../utils/businessSettings");
 
 const RAZORPAY_SECRET_MASK = "••••••••";
 
@@ -67,6 +72,8 @@ const createBusiness = asyncHandler(async (req, res) => {
         slug,
         owner: req.user._id
     });
+
+    await ensureBusinessSettings(business._id);
 
     res.status(201).json({
         success: true,
@@ -152,6 +159,10 @@ const updateBusiness = asyncHandler(async (req, res) => {
         runValidators: true
     }).select("+razorpayKeySecret");
 
+    if (updates.gstEnabled != null || updates.gstRate != null) {
+        await syncSettingsGstFromBusiness(business._id, updatedBusiness);
+    }
+
     res.status(200).json({
         success: true,
         message: "Business updated successfully",
@@ -172,6 +183,7 @@ const deleteBusiness = asyncHandler(async (req, res) => {
     await Promise.all([
         Product.deleteMany({ business: business._id }),
         Order.deleteMany({ business: business._id }),
+        BusinessSettings.deleteMany({ business: business._id }),
         Business.findByIdAndDelete(business._id)
     ]);
 

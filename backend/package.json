@@ -8,7 +8,7 @@
     "build": "node --check server.js",
     "dev": "nodemon server.js",
     "ci:backend": "npm run build",
-    "ci:qa": "node scripts/phase5-qa.js && node scripts/stage1-tenant-qa.js"
+    "ci:qa": "node scripts/phase5-qa.js && node scripts/stage2-settings-qa.js && node scripts/stage1-tenant-qa.js"
   },
   "engines": {
     "node": ">=20.12.0"

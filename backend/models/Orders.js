@@ -265,6 +265,17 @@ const orderSchema = new mongoose.Schema(
         stockRestoredAt: {
             type: Date,
             default: null
+        },
+
+        returnPolicySnapshot: {
+            enabled: {
+                type: Boolean
+            },
+            windowDays: {
+                type: Number,
+                min: 0,
+                max: 365
+            }
         }
     },
     {

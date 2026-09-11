@@ -4,6 +4,10 @@ const Order = require("../models/Orders");
 const Business = require("../models/Business");
 const aggregateOrderProducts = require("./aggregateOrderProducts");
 const { calculateOrderAmounts } = require("./gstCalculation");
+const {
+    resolveBusinessGstConfig,
+    getReturnPolicySnapshot
+} = require("./businessSettings");
 const { decrementStock, restoreStock } = require("./orderInventory");
 const {
     notifyOwnerNewOrder,
@@ -73,10 +77,10 @@ const createOrderForBusiness = async ({
         products
     );
 
-    const business = await Business.findById(normalizedBusinessId).select(
-        "businessName slug gstEnabled gstRate"
-    );
-    const { gstAmount, gstRate, totalAmount } = calculateOrderAmounts(subtotal, business);
+    const business = await Business.findById(normalizedBusinessId).select("businessName slug");
+    const gstConfig = await resolveBusinessGstConfig(normalizedBusinessId);
+    const { gstAmount, gstRate, totalAmount } = calculateOrderAmounts(subtotal, gstConfig);
+    const returnPolicySnapshot = await getReturnPolicySnapshot(normalizedBusinessId);
 
     const resolvedWhatsApp = isWhatsAppSameAsPhone ? customerPhone : customerWhatsApp;
 
@@ -108,6 +112,7 @@ const createOrderForBusiness = async ({
             paymentMethod,
             paymentStatus: getInitialPaymentStatus(paymentMethod),
             orderStatus: "New",
+            returnPolicySnapshot,
             trackingToken: generateTrackingToken()
         });
 

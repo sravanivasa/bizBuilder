@@ -1,9 +1,11 @@
 const roundMoney = (value) => Math.round(Number(value) * 100) / 100;
 
-const calculateOrderAmounts = (subtotal, business) => {
+const calculateOrderAmounts = (subtotal, gstConfig = {}) => {
     const normalizedSubtotal = roundMoney(subtotal);
+    const gstEnabled = Boolean(gstConfig.gstEnabled);
+    const configuredRate = gstConfig.gstRate != null ? Number(gstConfig.gstRate) : 18;
 
-    if (!business?.gstEnabled) {
+    if (!gstEnabled) {
         return {
             subtotal: normalizedSubtotal,
             gstAmount: 0,
@@ -12,7 +14,7 @@ const calculateOrderAmounts = (subtotal, business) => {
         };
     }
 
-    const gstRate = business.gstRate != null ? Number(business.gstRate) : 18;
+    const gstRate = configuredRate;
     const gstAmount = roundMoney((normalizedSubtotal * gstRate) / 100);
     const totalAmount = roundMoney(normalizedSubtotal + gstAmount);
 
